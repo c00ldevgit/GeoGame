@@ -1,0 +1,2555 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#f8fafc">
+<title>GeoGebra Math Game</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+:root {
+    color-scheme: light;
+    --primary: #4f46e5; --primary-hover: #4338ca; --primary-light: #e0e7ff;
+    --success: #10b981; --success-bg: #ecfdf5;
+    --danger: #ef4444; --danger-bg: #fef2f2;
+    --gold: #f59e0b; --gold-light: #fef3c7;
+    --bg-color: #f8fafc; --card-bg: #ffffff;
+    --text-main: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0;
+    --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+    --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+}
+body.dark {
+    color-scheme: dark;
+    --bg-color: #0f172a; --card-bg: #1e293b;
+    --text-main: #f1f5f9; --text-muted: #94a3b8; --border-color: #334155;
+    --primary-light: #312e81; --success-bg: #064e3b; --danger-bg: #7f1d1d;
+    --gold-light: #78350f;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color); color: var(--text-main);
+    height: 100%; width: 100%; overflow: hidden;
+    transition: background-color 0.25s, color 0.25s;
+}
+.screen { display: none; width: 100vw; height: 100vh; position: fixed; top:0; left:0; background-color: var(--bg-color); }
+.screen.active { display: flex; }
+
+.coin-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--gold-light); border: 2px solid var(--gold); color: #92400e;
+    padding: 8px 16px; border-radius: 999px; font-weight: 800; font-size: 1rem;
+    box-shadow: var(--shadow-sm);
+}
+body.dark .coin-badge { color: #fbbf24; }
+.coin-badge .coin-icon { font-size: 1.15rem; }
+
+#mainMenu { justify-content: center; align-items: center; flex-direction: column; gap: 10px; padding: 24px; overflow-y: auto; }
+.ggb-logo { font-size: 2.4rem; font-weight: 800; color: #d97706; margin-bottom: 4px; text-align: center; letter-spacing: -0.025em; }
+.ggb-logo span { color: var(--primary); }
+
+.menu-btn {
+    background-color: var(--card-bg); border: 2px solid var(--border-color); color: var(--text-main);
+    padding: 13px 22px; font-size: 0.98rem; font-weight: 600; border-radius: var(--radius-md);
+    cursor: pointer; width: 100%; max-width: 360px; text-align: center;
+    transition: all 0.2s; box-shadow: var(--shadow-sm);
+}
+.menu-btn:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.menu-btn:active { transform: scale(0.98); }
+.menu-btn.primary { background-color: var(--primary); border-color: var(--primary); color: #fff; }
+.menu-btn.accent { background-color: #10b981; border-color: #10b981; color: #fff; }
+.menu-btn.gold { background-color: var(--gold); border-color: var(--gold); color: #fff; }
+.menu-btn.purple { background: linear-gradient(135deg, #7c3aed, #a855f7); border-color: #7c3aed; color: #fff; }
+.menu-btn.ghost { background: transparent; border-color: var(--border-color); color: var(--text-muted); }
+.menu-btn:disabled, .menu-btn.disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+.modal-overlay {
+    position: fixed; top:0; left:0; width: 100vw; height: 100vh;
+    background: rgba(15,23,42,0.7); backdrop-filter: blur(4px);
+    z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal-card {
+    background: var(--card-bg); color: var(--text-main);
+    width: 100%; max-width: 520px; border-radius: var(--radius-lg);
+    padding: 26px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 16px;
+    animation: modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    max-height: 90vh; overflow-y: auto;
+}
+@keyframes modalPop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
+
+.list-screen { flex-direction: column; padding: 20px; align-items: center; overflow-y: auto; }
+.list-screen header { width: 100%; max-width: 900px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
+.levels-wrapper { max-width: 900px; width: 100%; display: flex; flex-direction: column; gap: 20px; padding-bottom: 40px; }
+.category-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; flex-wrap: wrap; }
+.category-title.easy { color: #059669; }
+.category-title.medium { color: #d97706; }
+.category-title.hard { color: var(--danger); }
+.category-title.expert { color: #7c3aed; }
+.category-title.custom { color: #7c3aed; }
+.levels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.level-card {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    padding: 16px; cursor: pointer; box-shadow: var(--shadow-sm); transition: all 0.2s ease; position: relative;
+}
+.level-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.level-card h3 { color: var(--primary); margin-bottom: 6px; font-size: 0.95rem; }
+.level-card p { color: var(--text-muted); font-size: 0.82rem; line-height: 1.4; }
+.level-card .level-meta { display: flex; gap: 10px; font-size: 0.72rem; color: var(--text-muted); margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border-color); flex-wrap: wrap; }
+.level-card.completed { border-color: #86efac; background: linear-gradient(135deg, var(--card-bg) 0%, var(--success-bg) 100%); }
+.completed-badge { position: absolute; top: -10px; right: -10px; background: var(--success); color: #fff; padding: 4px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; }
+.locked-badge { position: absolute; top: -10px; right: -10px; background: #64748b; color: #fff; padding: 4px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; }
+.reward-badge { display: inline-block; background: var(--gold-light); color: #92400e; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; }
+.reward-badge.done { background: var(--border-color); color: var(--text-muted); }
+.level-card.locked { opacity: 0.55; cursor: not-allowed; background: var(--bg-color); filter: grayscale(0.6); }
+.level-card.locked:hover { transform: none; box-shadow: var(--shadow-sm); border-color: var(--border-color); }
+.level-card.locked h3 { color: var(--text-muted); }
+
+.workspace-screen { flex-direction: row; }
+@media (max-width: 768px) { .workspace-screen { flex-direction: column-reverse; } }
+.algebra-panel { width: 420px; background: var(--card-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; height: 100%; z-index: 10; box-shadow: var(--shadow-sm); }
+@media (max-width: 768px) { .algebra-panel { width: 100%; height: 48vh; border-right: none; border-top: 1px solid var(--border-color); } }
+.ggb-toolbar { height: 50px; background: var(--card-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 12px; gap: 8px; flex-shrink: 0; }
+.ggb-toolbar .spacer { flex: 1; }
+.icon-btn { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer; font-size: 0.88rem; font-weight: 500; color: var(--text-main); transition: background 0.15s; }
+.icon-btn:hover { background: var(--bg-color); }
+.algebra-content { flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.input-row { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; align-items: center; gap: 8px; transition: border-color 0.15s, box-shadow 0.15s; }
+.input-row:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.input-row label { font-weight: 600; color: var(--primary); font-family: serif; font-style: italic; font-size: 1.1rem; }
+.input-row input { border: none; outline: none; font-size: 1.05rem; width: 100%; font-family: ui-monospace, monospace; color: var(--text-main); background: transparent; }
+.delete-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem; padding: 2px 6px; border-radius: 4px; }
+.add-btn { background-color: var(--card-bg); border: 2px dashed var(--border-color); color: var(--text-muted); padding: 12px; font-size: 0.95rem; font-weight: 600; border-radius: var(--radius-sm); cursor: pointer; text-align: center; }
+.math-keyboard { background: var(--bg-color); border-top: 1px solid var(--border-color); padding: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; flex-shrink: 0; }
+.math-key { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 0; font-size: 0.95rem; font-weight: 600; color: var(--text-main); cursor: pointer; text-align: center; }
+.level-description { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 12px 14px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.88rem; color: var(--text-main); line-height: 1.45; }
+.status-box { padding: 12px; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.92rem; text-align: center; }
+.status-box.success { background: var(--success-bg); color: #065f46; border: 1px solid #a7f3d0; }
+.status-box.fail { background: var(--danger-bg); color: #991b1b; border: 1px solid #fecaca; }
+.status-box.neutral { background: var(--bg-color); color: var(--text-muted); border: 1px solid var(--border-color); }
+body.dark .status-box.success { color: #6ee7b7; }
+body.dark .status-box.fail { color: #fca5a5; }
+.hint-footer { color: var(--text-muted); font-size: 0.78rem; line-height: 1.4; margin-top: auto; }
+.hint-footer code { background: var(--bg-color); padding: 1px 5px; border-radius: 3px; font-family: ui-monospace, monospace; }
+
+.graphics-view { flex: 1; height: 100%; position: relative; background: #fff; touch-action: none; overflow: hidden; transition: height 0.25s ease; }
+body.dark .graphics-view { background: #0f172a; }
+@media (max-width: 768px) {
+    .graphics-view { height: 52vh; }
+    body.input-focused .graphics-view,
+    body.keyboard-open .graphics-view { height: 32vh; }
+    body.input-focused .hint-footer,
+    body.keyboard-open .hint-footer { display: none; }
+}
+canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+.coord-tooltip { position: absolute; background: rgba(30,41,59,0.95); color: #fff; padding: 6px 12px; border-radius: var(--radius-sm); font-family: ui-monospace, monospace; font-size: 0.85rem; font-weight: 700; pointer-events: none; transform: translate(-50%,-140%); white-space: nowrap; opacity: 0; transition: opacity 0.1s; z-index: 50; box-shadow: var(--shadow-md); }
+.coord-tooltip.show { opacity: 1; }
+.coord-tag { display: inline-block; font-size: 0.7rem; padding: 1px 5px; border-radius: 3px; margin-left: 6px; font-weight: 700; }
+.coord-tag.on-line { background: var(--primary); color: #fff; }
+.coord-tag.on-target { background: var(--success); color: #fff; }
+.coord-tag.on-obstacle { background: var(--danger); color: #fff; }
+
+.zoom-controls { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-md); overflow: hidden; }
+.zoom-btn { background: var(--card-bg); border: none; width: 42px; height: 42px; font-size: 1.2rem; cursor: pointer; color: var(--text-main); }
+.zoom-btn:hover { background: var(--bg-color); }
+
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; width: 100%; max-width: 900px; }
+.shop-item { background: var(--card-bg); border: 2px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.shop-item.owned { border-color: #86efac; }
+.shop-item .item-icon { font-size: 1.8rem; text-align: center; }
+.shop-item h4 { font-size: 0.95rem; text-align: center; }
+.shop-item .item-desc { font-size: 0.78rem; color: var(--text-muted); text-align: center; min-height: 34px; }
+.shop-item .item-preview { height: 36px; display: flex; align-items: center; justify-content: center; background: var(--bg-color); border-radius: var(--radius-sm); }
+.shop-item .preview-line { width: 60%; height: 4px; border-radius: 2px; }
+.shop-item .buy-btn { padding: 9px; border-radius: var(--radius-sm); font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; }
+.shop-item .buy-btn.affordable { background: var(--gold); color: #fff; }
+.shop-item .buy-btn.expensive { background: var(--border-color); color: var(--text-muted); cursor: not-allowed; }
+.shop-item .buy-btn.owned-btn { background: var(--success); color: #fff; }
+.shop-item .buy-btn.equip-btn { background: var(--primary); color: #fff; }
+.shop-item .buy-btn.equipped-btn { background: var(--border-color); color: var(--text-muted); cursor: default; }
+
+.player-bar { display: flex; align-items: center; gap: 10px; background: var(--card-bg); border: 2px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; box-shadow: var(--shadow-sm); max-width: 380px; width: 100%; justify-content: space-between; }
+.player-bar .progress-info { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.player-bar .progress-text { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); }
+.player-bar .progress-track { width: 100%; height: 6px; background: var(--border-color); border-radius: 999px; overflow: hidden; }
+.player-bar .progress-fill { height: 100%; background: linear-gradient(90deg, var(--success), #34d399); border-radius: 999px; transition: width 0.4s ease; }
+
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: var(--text-main); color: #fff; padding: 14px 22px; border-radius: var(--radius-md); font-weight: 700; font-size: 0.92rem; box-shadow: var(--shadow-lg); z-index: 2000; transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1); max-width: 90vw; text-align: center; }
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.reward { background: linear-gradient(135deg, var(--gold), #d97706); }
+.toast.fail { background: linear-gradient(135deg, var(--danger), #b91c1c); }
+
+.achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; width: 100%; max-width: 900px; }
+.ach-card { background: var(--card-bg); border: 2px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; display: flex; gap: 10px; align-items: center; }
+.ach-card.unlocked { border-color: var(--gold); background: linear-gradient(135deg, var(--card-bg) 0%, var(--gold-light) 100%); }
+.ach-card.locked { opacity: 0.55; filter: grayscale(0.5); }
+.ach-icon { font-size: 1.8rem; flex-shrink: 0; }
+.ach-info h4 { font-size: 0.9rem; }
+.ach-info p { font-size: 0.75rem; color: var(--text-muted); line-height: 1.3; }
+.ach-reward { font-size: 0.7rem; color: var(--gold); font-weight: 700; margin-top: 2px; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; width: 100%; max-width: 900px; }
+.stat-card { background: var(--card-bg); border: 2px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; text-align: center; }
+.stat-card .stat-value { font-size: 1.6rem; font-weight: 800; color: var(--primary); }
+.stat-card .stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
+
+.color-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.color-swatch { aspect-ratio: 1; border-radius: var(--radius-sm); border: 3px solid transparent; cursor: pointer; }
+.color-swatch.selected { border-color: var(--primary); transform: scale(1.1); }
+
+.export-area { width: 100%; min-height: 120px; font-family: ui-monospace, monospace; font-size: 0.78rem; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color); color: var(--text-main); resize: vertical; }
+.daily-gift { font-size: 4.5rem; animation: bounceIn 0.6s; text-align: center; }
+@keyframes bounceIn { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+.expert-banner { background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 600; line-height: 1.4; }
+.lang-switcher { position: fixed; top: 12px; right: 12px; z-index: 900; display: flex; gap: 4px; background: var(--card-bg); border: 2px solid var(--border-color); border-radius: 999px; padding: 3px; box-shadow: var(--shadow-md); }
+.lang-btn { background: transparent; border: none; padding: 6px 10px; border-radius: 999px; cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); }
+.lang-btn.active { background: var(--primary); color: #fff; }
+
+@keyframes spin { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+.spin { animation: spin 2s linear infinite; display: inline-block; }
+
+.mp-opp-block { background: #fef2f2; border-radius: var(--radius-sm); padding: 10px; border-left: 4px solid var(--danger); }
+body.dark .mp-opp-block { background: #3f1f1f; }
+.mp-my-block { background: var(--primary-light); border-radius: var(--radius-sm); padding: 10px; border-left: 4px solid var(--primary); }
+.mp-block-label { font-size: 0.68rem; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.mp-scores { display: flex; justify-content: space-between; padding: 8px; background: var(--bg-color); border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="lang-switcher">
+    <button class="lang-btn" id="langBtnRu" onclick="setLanguage('ru')">RU</button>
+    <button class="lang-btn" id="langBtnEn" onclick="setLanguage('en')">EN</button>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- DAILY BONUS -->
+<div id="dailyBonusModal" class="modal-overlay">
+    <div class="modal-card" style="text-align:center;">
+        <div class="daily-gift">🎁</div>
+        <h2 id="dailyTitle" style="color: var(--gold); font-size:1.3rem;"></h2>
+        <p id="dailyDesc" style="color: var(--text-muted);"></p>
+        <div class="coin-badge" style="align-self:center; font-size:1.2rem; padding: 12px 24px;">
+            <span class="coin-icon" style="font-size:1.5rem;">🪙</span><span>+100</span>
+        </div>
+        <button class="menu-btn primary" style="max-width:none;" onclick="claimDailyBonus()" data-i18n="dailyClaim"></button>
+    </div>
+</div>
+
+<!-- TUTORIAL -->
+<div id="tutorialModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="tutTitle"></h3>
+            <span id="tutStepIndicator" style="font-size:0.82rem; color: var(--text-muted);"></span>
+        </div>
+        <div id="tutBody" style="font-size:0.95rem; line-height:1.6; min-height:120px;"></div>
+        <div style="display: flex; justify-content: space-between; gap:10px;">
+            <button class="icon-btn" onclick="closeTutorial()" data-i18n="skip"></button>
+            <div style="display: flex; gap:8px;">
+                <button class="icon-btn" id="tutPrevBtn" onclick="prevTutorialStep()" data-i18n="prev"></button>
+                <button class="menu-btn primary" id="tutNextBtn" onclick="nextTutorialStep()" style="padding:8px 20px; font-size:0.92rem; width:auto; max-width:none;"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- LEVEL COMPLETE -->
+<div id="levelCompleteModal" class="modal-overlay">
+    <div class="modal-card" style="text-align:center;">
+        <div style="font-size: 3rem;">🎉</div>
+        <div id="completeTitleText" style="font-size:1.4rem; font-weight:800; color: var(--success);"></div>
+        <div id="completeLevelName" style="font-size:0.95rem; color: var(--text-muted); font-weight:600;"></div>
+        <div style="background: var(--bg-color); border: 1px dashed var(--border-color); border-radius: var(--radius-sm); padding: 12px; font-family: ui-monospace, monospace; font-size: 0.92rem; text-align: left;">
+            <div id="yourSolutionLabel" style="font-size:0.68rem; color: var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;"></div>
+            f(x) = <span id="completeSolution" style="color: var(--primary); font-weight:700;"></span>
+        </div>
+        <div id="completeReward" class="coin-badge" style="align-self:center; padding: 12px 22px; font-size:1.05rem;">
+            <span class="coin-icon" style="font-size:1.3rem;">🪙</span>
+            <span id="receivedLabel"></span>
+            <span id="completeRewardAmount"></span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="menu-btn ghost" id="btnPrevLevel" onclick="goToPrevLevel()" style="flex:1; padding: 12px;" data-i18n="prevLevel"></button>
+            <button class="menu-btn primary" id="btnNextLevel" onclick="goToNextLevel()" style="flex:1; padding: 12px;" data-i18n="nextLevel"></button>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="menu-btn" onclick="closeLevelComplete()" style="flex:1; padding: 12px;" data-i18n="toLevels"></button>
+            <button class="menu-btn accent" onclick="retryLevel()" style="flex:1; padding: 12px;" data-i18n="retry"></button>
+        </div>
+    </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settingsModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 data-i18n="settings"></h3>
+            <button class="icon-btn" onclick="closeModal('settingsModal')">✕</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button class="menu-btn" onclick="toggleDarkTheme()" style="max-width:none; text-align:left;" id="themeToggleBtn"></button>
+            <button class="menu-btn" onclick="openAchievements()" style="max-width:none; text-align:left;">
+                <span data-i18n="achievements"></span> <span id="achCountBadge" style="float:right; color: var(--gold); font-weight:800;"></span>
+            </button>
+            <button class="menu-btn" onclick="openStats()" style="max-width:none; text-align:left;" data-i18n="stats"></button>
+            <button class="menu-btn" onclick="openSkinCustomizer()" style="max-width:none; text-align:left;" data-i18n="mySkin"></button>
+            <button class="menu-btn" onclick="openExportImport()" style="max-width:none; text-align:left;" data-i18n="exportImport"></button>
+            <button class="menu-btn" onclick="resetProgress()" style="max-width:none; text-align:left; color: var(--danger); border-color: #fca5a5;" data-i18n="resetAll"></button>
+        </div>
+    </div>
+</div>
+
+<!-- ACHIEVEMENTS -->
+<div id="achievementsModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 720px;">
+        <div class="modal-header"><h3 data-i18n="achievements"></h3><button class="icon-btn" onclick="closeModal('achievementsModal')">✕</button></div>
+        <div id="achievementsContainer" class="achievements-grid"></div>
+    </div>
+</div>
+
+<!-- STATS -->
+<div id="statsModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 720px;">
+        <div class="modal-header"><h3 data-i18n="stats"></h3><button class="icon-btn" onclick="closeModal('statsModal')">✕</button></div>
+        <div id="statsContainer" class="stats-grid"></div>
+    </div>
+</div>
+
+<!-- SKIN CUSTOMIZER -->
+<div id="skinCustomizerModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header"><h3 data-i18n="mySkin"></h3><button class="icon-btn" onclick="closeModal('skinCustomizerModal')">✕</button></div>
+        <p style="color: var(--text-muted); font-size:0.88rem;" data-i18n="skinDesc"></p>
+        <div id="colorPalette" class="color-palette"></div>
+        <div>
+            <label style="display: block; font-size:0.82rem; font-weight:600; margin-bottom:6px;"><span data-i18n="thickness"></span>: <span id="widthValue">3</span> px</label>
+            <input type="range" id="widthSlider" min="1" max="8" step="1" value="3" style="width:100%;">
+        </div>
+        <div style="height:60px; background: var(--bg-color); border-radius: var(--radius-sm); display:flex; align-items:center; justify-content:center;">
+            <div id="skinPreviewLine" style="width:70%; height:3px; background:#4f46e5; border-radius:2px;"></div>
+        </div>
+        <button class="menu-btn primary" style="max-width:none;" onclick="saveSkinCustomization()" data-i18n="save"></button>
+    </div>
+</div>
+
+<!-- EXPORT/IMPORT -->
+<div id="exportImportModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 640px;">
+        <div class="modal-header"><h3 data-i18n="exportImport"></h3><button class="icon-btn" onclick="closeModal('exportImportModal')">✕</button></div>
+        <p style="font-size:0.85rem; color: var(--text-muted);" data-i18n="exportDesc"></p>
+        <textarea id="exportArea" class="export-area"></textarea>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="menu-btn primary" style="flex:1; padding:10px; max-width:none;" onclick="exportLevels()" data-i18n="exportBtn"></button>
+            <button class="menu-btn accent" style="flex:1; padding:10px; max-width:none;" onclick="importLevels()" data-i18n="importBtn"></button>
+            <button class="menu-btn" style="flex:1; padding:10px; max-width:none;" onclick="copyExport()" data-i18n="copyBtn"></button>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN MENU -->
+<div id="mainMenu" class="screen active">
+    <div class="ggb-logo">Geo<span>Gebra</span> Game</div>
+    <div class="player-bar">
+        <div class="progress-info">
+            <div class="progress-text" id="progressText"></div>
+            <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
+        <div class="coin-badge"><span class="coin-icon">🪙</span><span id="coinCount">0</span></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 360px; align-items:center;">
+        <button class="menu-btn primary" onclick="showScreen('levelsScreen')" data-i18n="playLevels"></button>
+        <button class="menu-btn purple" onclick="openMultiplayer()">⚔️ Мультиплеер</button>
+        <button class="menu-btn gold" onclick="openShop()" data-i18n="shop"></button>
+        <button class="menu-btn" onclick="showScreen('expertScreen')" data-i18n="expertLevels"></button>
+        <button class="menu-btn accent" onclick="openTutorial()" data-i18n="tutorial"></button>
+        <button class="menu-btn" onclick="showScreen('editorMenuScreen')" data-i18n="editor"></button>
+        <button class="menu-btn" onclick="openFreeCalculator()" data-i18n="calculator"></button>
+        <button class="menu-btn" onclick="openModal('settingsModal')" data-i18n="settings"></button>
+    </div>
+</div>
+
+<!-- LEVELS -->
+<div id="levelsScreen" class="screen list-screen">
+    <header>
+        <h2 style="font-size: 1.3rem;" data-i18n="chooseLevel"></h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="coin-badge"><span class="coin-icon">🪙</span><span class="coinCountBadge">0</span></div>
+            <button class="icon-btn" onclick="showScreen('mainMenu')" data-i18n="backMenu"></button>
+        </div>
+    </header>
+    <div class="levels-wrapper" id="levelsContainer"></div>
+</div>
+
+<!-- EXPERT -->
+<div id="expertScreen" class="screen list-screen">
+    <header>
+        <h2 style="font-size: 1.3rem;" data-i18n="expertLevels"></h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="coin-badge"><span class="coin-icon">🪙</span><span class="coinCountBadge">0</span></div>
+            <button class="icon-btn" onclick="showScreen('mainMenu')" data-i18n="backMenu"></button>
+        </div>
+    </header>
+    <div class="levels-wrapper" id="expertContainer"></div>
+</div>
+
+<!-- SHOP -->
+<div id="shopScreen" class="screen list-screen">
+    <header>
+        <h2 style="font-size: 1.3rem;" data-i18n="shop"></h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="coin-badge"><span class="coin-icon">🪙</span><span class="coinCountBadge">0</span></div>
+            <button class="icon-btn" onclick="showScreen('mainMenu')" data-i18n="backMenu"></button>
+        </div>
+    </header>
+    <div class="shop-grid" id="shopContainer"></div>
+</div>
+
+<!-- EDITOR MENU -->
+<div id="editorMenuScreen" class="screen list-screen">
+    <header>
+        <h2 style="font-size: 1.3rem;" data-i18n="myLevels"></h2>
+        <button class="icon-btn" onclick="showScreen('mainMenu')" data-i18n="backMenu"></button>
+    </header>
+    <div class="levels-wrapper">
+        <div style="display: flex; justify-content: flex-end;">
+            <button class="menu-btn primary" onclick="openNewEditor()" style="width:auto; padding:10px 16px; font-size:0.9rem; max-width:none;" data-i18n="createLevel"></button>
+        </div>
+        <div id="customLevelsContainer"></div>
+    </div>
+</div>
+
+<!-- GAME -->
+<div id="gameScreen" class="screen workspace-screen">
+    <div class="algebra-panel">
+        <div class="ggb-toolbar">
+            <button class="icon-btn" onclick="goBackFromGame()" data-i18n="backHome"></button>
+            <button class="icon-btn" onclick="showScreen('mainMenu')" data-i18n="menuShort"></button>
+            <div class="spacer"></div>
+            <div class="coin-badge" style="padding:4px 10px; font-size:0.8rem;"><span class="coin-icon">🪙</span><span class="coinCountBadge">0</span></div>
+        </div>
+        <div class="algebra-content">
+            <div class="level-description" id="gameDescription"></div>
+            <div id="expertBanner" class="expert-banner" style="display:none;"></div>
+            <div class="input-row">
+                <label>f(x) =</label>
+                <input type="text" id="funcInput" autocomplete="off" spellcheck="false">
+            </div>
+            <div id="statusBox" class="status-box neutral"></div>
+            <div class="hint-footer" id="gameHintFooter"></div>
+        </div>
+    </div>
+    <div class="graphics-view" id="graphicsContainer">
+        <canvas id="canvas"></canvas>
+        <div class="coord-tooltip" id="gameTooltip"></div>
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <button class="zoom-btn" onclick="zoomOut()">–</button>
+            <button class="zoom-btn" onclick="resetView()">⊙</button>
+        </div>
+    </div>
+</div>
+
+<!-- FREE CALC -->
+<div id="freeCalcScreen" class="screen workspace-screen">
+    <div class="algebra-panel">
+        <div class="ggb-toolbar">
+            <button class="icon-btn" onclick="showScreen('mainMenu')" data-i18n="backHome"></button>
+            <span style="font-weight:600; font-size:0.9rem;" data-i18n="calculatorShort"></span>
+            <div class="spacer"></div>
+            <button class="icon-btn" id="freeCalcModeBtn" onclick="toggleFreeCalcMode()"></button>
+        </div>
+        <div class="algebra-content" id="freeFunctionsContainer"></div>
+        <button class="add-btn" onclick="addFreeFunctionRow()" data-i18n="addFunction"></button>
+        <div class="math-keyboard">
+            <button class="math-key primary-key" onclick="insertToActiveInput('x')">x</button>
+            <button class="math-key" onclick="insertToActiveInput('^2')">x²</button>
+            <button class="math-key" onclick="insertToActiveInput('+')">+</button>
+            <button class="math-key" onclick="insertToActiveInput('-')">−</button>
+            <button class="math-key" onclick="insertToActiveInput('*')">×</button>
+            <button class="math-key" onclick="insertToActiveInput('/')">÷</button>
+            <button class="math-key" onclick="insertToActiveInput('sin(')">sin</button>
+            <button class="math-key" onclick="insertToActiveInput('cos(')">cos</button>
+            <button class="math-key" onclick="insertToActiveInput('sqrt(')">√</button>
+            <button class="math-key" onclick="insertToActiveInput('abs(')">|x|</button>
+            <button class="math-key" onclick="insertToActiveInput('(')">(</button>
+            <button class="math-key" onclick="insertToActiveInput(')')">)</button>
+        </div>
+    </div>
+    <div class="graphics-view" id="freeGraphicsContainer">
+        <canvas id="freeCanvas"></canvas>
+        <div class="coord-tooltip" id="freeTooltip"></div>
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="freeZoomIn()">+</button>
+            <button class="zoom-btn" onclick="freeZoomOut()">–</button>
+            <button class="zoom-btn" onclick="freeResetView()">⊙</button>
+            <button class="zoom-btn" onclick="freeClearTargets()">✕</button>
+        </div>
+    </div>
+</div>
+
+<!-- EDITOR -->
+<div id="editorScreen" class="screen workspace-screen">
+    <div class="algebra-panel">
+        <div class="ggb-toolbar">
+            <button class="icon-btn" onclick="showScreen('editorMenuScreen')" data-i18n="backList"></button>
+        </div>
+        <div class="algebra-content">
+            <div class="level-description" data-i18n="editorHint"></div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <button class="icon-btn" id="toolTarget" onclick="setEditorTool('target')" data-i18n="toolTarget"></button>
+                <button class="icon-btn" id="toolRect" onclick="setEditorTool('rect')" data-i18n="toolRect"></button>
+                <button class="icon-btn" id="toolCircle" onclick="setEditorTool('circle')" data-i18n="toolCircle"></button>
+                <button class="icon-btn" id="toolLine" onclick="setEditorTool('line')" data-i18n="toolLine"></button>
+                <button class="icon-btn" id="toolEraser" onclick="setEditorTool('eraser')" style="color: var(--danger);" data-i18n="toolEraser"></button>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button class="icon-btn" onclick="editorUndo()" style="flex:1; padding:8px;">↩️</button>
+                <button class="icon-btn" onclick="editorRedo()" style="flex:1; padding:8px;">🔁</button>
+            </div>
+            <div class="input-row">
+                <label style="font-style:normal; font-family:inherit; font-size:0.85rem;" data-i18n="levelName"></label>
+                <input type="text" id="levelNameInput" style="font-family:inherit;">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="menu-btn primary" id="saveEditorBtn" style="width:100%; padding:10px; max-width:none;" data-i18n="save"></button>
+                <button class="menu-btn" id="clearEditorBtn" style="width:100%; padding:10px; color: var(--danger); max-width:none;" data-i18n="clear"></button>
+            </div>
+        </div>
+    </div>
+    <div class="graphics-view" id="editorGraphicsContainer">
+        <canvas id="editorCanvas"></canvas>
+        <div class="coord-tooltip" id="editorTooltip"></div>
+    </div>
+</div>
+
+<!-- MULTIPLAYER LOBBY -->
+<div id="multiplayerScreen" class="screen list-screen">
+    <header>
+        <h2 style="font-size: 1.3rem;">⚔️ Мультиплеер</h2>
+        <button class="icon-btn" onclick="showScreen('mainMenu')">← В меню</button>
+    </header>
+    <div class="levels-wrapper" style="max-width: 460px;">
+        <div class="input-row" style="margin-bottom: 8px;">
+            <label style="font-style: normal; font-family: inherit; font-size: 0.88rem;">Ник:</label>
+            <input type="text" id="mpNickname" placeholder="Твой ник" maxlength="20" style="font-family: inherit;">
+        </div>
+        <button class="menu-btn primary" onclick="startMatchmaking()" style="max-width:none;">🔍 Найти соперника</button>
+        <button class="menu-btn" onclick="openPrivateRoom()" style="max-width:none;">🔗 Приватная комната</button>
+        <button class="menu-btn" onclick="openMatches()" style="max-width:none;">🏆 Матчи и наблюдатели</button>
+    </div>
+</div>
+
+<!-- MATCHMAKING -->
+<div id="matchmakingScreen" class="screen list-screen" style="justify-content: center; align-items: center; text-align: center;">
+    <div style="font-size: 4rem;" class="spin">⚙️</div>
+    <h2 style="color: var(--primary); margin: 20px 0;">Поиск соперника...</h2>
+    <p style="color: var(--text-muted); margin-bottom: 20px;">Ждём второго игрока в твоей сети</p>
+    <button class="menu-btn ghost" onclick="cancelMatchmaking()" style="max-width:none;">Отменить</button>
+</div>
+
+<!-- PRIVATE ROOM -->
+<div id="privateRoomScreen" class="screen list-screen" style="justify-content: center; align-items: center;">
+    <div class="modal-card" style="max-width: 400px;">
+        <h3 style="color: var(--primary); text-align: center;">🔗 Приватная комната</h3>
+        <div id="privateRoomCreate" style="display: flex; flex-direction: column; gap: 12px;">
+            <button class="menu-btn primary" onclick="createPrivateRoom()" style="max-width:none;">Создать комнату</button>
+            <div style="text-align: center; color: var(--text-muted); font-size: 0.82rem;">— или —</div>
+            <div class="input-row">
+                <label style="font-style: normal;">Код:</label>
+                <input type="text" id="privateRoomCode" placeholder="XXXX" maxlength="4" style="font-family: monospace; text-transform: uppercase; font-size: 1.3rem; letter-spacing: 4px; text-align: center;">
+            </div>
+            <button class="menu-btn accent" onclick="joinPrivateRoom()" style="max-width:none;">Присоединиться</button>
+        </div>
+        <div id="privateRoomWaiting" style="display: none; text-align: center;">
+            <p style="color: var(--text-muted);">Поделись кодом с другом:</p>
+            <div id="privateRoomCodeDisplay" style="font-size: 2.8rem; font-weight: 800; letter-spacing: 8px; color: var(--primary); margin: 20px 0; font-family: monospace;">----</div>
+            <p style="color: var(--text-muted); font-size: 0.82rem;">Ждём соперника...</p>
+        </div>
+        <button class="menu-btn ghost" onclick="showScreen('multiplayerScreen')" style="max-width:none; margin-top: 12px;">Отмена</button>
+    </div>
+</div>
+
+<!-- MATCHES -->
+<div id="matchesScreen" class="screen list-screen">
+    <header>
+        <h2 style="font-size: 1.3rem;">🏆 Матчи</h2>
+        <button class="icon-btn" onclick="showScreen('mainMenu')">← В меню</button>
+    </header>
+    <div class="levels-wrapper" style="max-width: 700px;">
+        <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+            <button class="icon-btn" id="tabActive" onclick="switchMatchesTab('active')" style="flex:1;">🔴 Сейчас</button>
+            <button class="icon-btn" id="tabHistory" onclick="switchMatchesTab('history')" style="flex:1;">📜 История</button>
+            <button class="icon-btn" id="tabStats" onclick="switchMatchesTab('stats')" style="flex:1;">📊 Статистика</button>
+        </div>
+        <div id="matchesContent"></div>
+    </div>
+</div>
+
+<!-- MP GAME -->
+<div id="mpGameScreen" class="screen workspace-screen">
+    <div class="algebra-panel">
+        <div class="ggb-toolbar">
+            <button class="icon-btn" onclick="forfeitMatch()">🚪 Сдаться</button>
+            <div class="spacer"></div>
+            <div id="mpRoundInfo" style="font-size: 0.82rem; font-weight: 700; color: var(--primary);">Раунд 1/3</div>
+            <div class="spacer"></div>
+            <div id="mpTimer" style="font-size: 0.82rem; font-weight: 700; color: var(--gold); font-family: monospace;">0.0s</div>
+        </div>
+        <div class="algebra-content">
+            <div class="mp-scores">
+                <span id="mpScoreP1">Ты: 0</span>
+                <span id="mpScoreP2">Соперник: 0</span>
+            </div>
+            <div class="level-description" id="mpLevelDesc">Уровень...</div>
+            
+            <div class="mp-my-block">
+                <div class="mp-block-label" style="color: var(--primary);">🔵 ТЫ</div>
+                <div class="input-row">
+                    <label>f(x) =</label>
+                    <input type="text" id="mpMyInput" autocomplete="off" spellcheck="false" placeholder="твоя формула">
+                </div>
+                <div id="mpMyStatus" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; min-height: 14px;"></div>
+            </div>
+            
+            <div class="mp-opp-block">
+                <div class="mp-block-label" style="color: var(--danger);">🔴 <span id="mpOppName">СОПЕРНИК</span></div>
+                <div class="input-row" style="background: var(--card-bg);">
+                    <label style="color: var(--danger);">f(x) =</label>
+                    <input type="text" id="mpOppInput" readonly placeholder="— ожидание —" style="color: var(--text-muted);">
+                </div>
+                <div id="mpOppStatus" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; min-height: 14px;"></div>
+            </div>
+            
+            <div id="mpStatusBox" class="status-box neutral">Введи формулу</div>
+            
+            <button class="menu-btn ghost" id="mpSkipBtn" onclick="requestSkip()" style="width:100%; padding: 10px; font-size: 0.88rem; max-width:none; margin-top: auto;">⏭️ Пропустить</button>
+        </div>
+    </div>
+    <div class="graphics-view" id="mpGraphicsContainer">
+        <canvas id="mpCanvas"></canvas>
+        <div class="coord-tooltip" id="mpTooltip"></div>
+        <div id="mpSpectatorBadge" style="display:none; position:absolute; top:12px; left:12px; background: rgba(0,0,0,0.8); color: #fff; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 700; z-index: 60;">👁 <span id="mpSpectatorCount">0</span></div>
+    </div>
+</div>
+
+<!-- MATCH RESULT -->
+<div id="matchResultModal" class="modal-overlay">
+    <div class="modal-card" style="text-align: center;">
+        <div id="matchResultEmoji" style="font-size: 3.5rem;"></div>
+        <h2 id="matchResultTitle" style="font-size: 1.4rem; font-weight: 800;"></h2>
+        <div id="matchResultDetails" style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;"></div>
+        <div id="matchResultReward" class="coin-badge" style="align-self:center; padding: 12px 22px; font-size: 1.05rem;"></div>
+        <div style="display: flex; gap: 10px;">
+            <button class="menu-btn primary" onclick="closeMatchResult()" style="flex:1;">🏠 В меню</button>
+            <button class="menu-btn accent" onclick="playAgain()" style="flex:1;">⚔️ Ещё раз</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ============================================================
+   LOCALIZATION (сокращено до ключевых)
+============================================================ */
+const I18N = {
+    ru: {
+        playLevels: "🎮 Проходить уровни", shop: "🛒 Магазин",
+        expertLevels: "🧠 Экспертные уровни", tutorial: "📖 Обучение",
+        editor: "🛠 Конструктор", calculator: "📈 Свободный калькулятор",
+        settings: "⚙️ Настройки", chooseLevel: "Выбор уровня",
+        backMenu: "← В меню", backHome: "🏠 Назад", menuShort: "Меню",
+        backList: "🏠 К списку", calculatorShort: "Калькулятор",
+        myLevels: "Мои уровни", createLevel: "+ Создать уровень",
+        addFunction: "+ Добавить функцию", skip: "Пропустить", prev: "Назад",
+        next: "Далее →", start: "Начать! 🎉", prevLevel: "← Предыдущий",
+        nextLevel: "Следующий →", toLevels: "🏠 К уровням", retry: "🔁 Повторить",
+        yourSolution: "Ваше решение", received: "Получено:",
+        alreadyDone: "0 (уже пройден)", darkTheme: "🌙 Тёмная тема",
+        lightTheme: "☀️ Светлая тема", achievements: "🏆 Достижения",
+        stats: "📊 Статистика", mySkin: "🎨 Мой скин",
+        exportImport: "📤 Экспорт / 📥 Импорт",
+        resetAll: "🗑 Сбросить весь прогресс",
+        skinDesc: "Выбери цвет и толщину линии", thickness: "Толщина",
+        save: "Сохранить", clear: "Очистить",
+        exportDesc: "Скопируй JSON и отправь другу.",
+        exportBtn: "📤 Экспорт", importBtn: "📥 Импорт", copyBtn: "📋 Копировать",
+        levelName: "Название:", editorHint: "Выберите инструмент и тапните по плоскости.",
+        toolTarget: "🟢 1. Цель", toolRect: "🟥 2. Прямоугольник",
+        toolCircle: "🔴 3. Круг", toolLine: "➖ 4. Линия (2 клика)",
+        toolEraser: "🧽 5. Ластик",
+        dailyTitle: "Ежедневный бонус!", dailyDesc: "Заходи каждый день — получай монеты.",
+        dailyClaim: "Забрать!",
+        statusEnter: "Введите функцию", statusSyntaxError: "❌ Ошибка синтаксиса",
+        statusHitObstacle: "❌ Задета преграда!", statusPassed: "🎉 Пройдено!",
+        statusAlreadyDone: "🎉 Уже пройден", statusGoalMissed: "✍️ Цель не достигнута",
+        statusTargetsProgress: (n, total) => `🎯 Цели: ${n}/${total}`,
+        categoryEasy: "🟢 Лёгкие", categoryMedium: "🟡 Средние",
+        categoryHard: "🔴 Сложные", categoryExpert: "🧠 Экспертные",
+        categoryCustom: "🟣 Ваши уровни",
+        lockedHint: "Сначала пройди предыдущую категорию",
+        passedBadge: "✓ пройдено", noCustomLevels: "Нет уровней. Создай первый!",
+        hintFooter: "<strong>Подсказка:</strong> <code>x^2</code>, <code>sin(x)</code>, <code>sqrt(x)</code>, <code>abs(x)</code>. Тапни по графику — увидишь координаты.",
+        shopItems: {
+            skin_gold: { name: "Золотая линия", desc: "Золото" },
+            skin_neon: { name: "Неоновая", desc: "Яркий неон" },
+            skin_fire: { name: "Огненная", desc: "Жарко!" },
+            skin_rainbow: { name: "Радужная", desc: "Разноцветная" },
+            theme_dark: { name: "Тёмная тема", desc: "Для глаз" },
+            bonus_double: { name: "×2 монеты", desc: "5 уровней ×2" },
+            custom_skin: { name: "Мой цвет", desc: "Свои цвет и толщина" }
+        },
+        shopBuy: "Купить", shopNeed: "Нужно", shopWear: "Надеть",
+        shopWorn: "✓ Надето", shopCustomize: "🎨 Настроить",
+        achNames: {
+            first_step: { name: "Первый шаг", desc: "Пройди первый уровень" },
+            easy_master: { name: "Лёгкий старт", desc: "5 лёгких" },
+            easy_all: { name: "Лёгкие — все!", desc: "Все лёгкие" },
+            medium_half: { name: "На полпути", desc: "5 средних" },
+            medium_all: { name: "Средние — все!", desc: "Все средние" },
+            hard_first: { name: "Сложный вызов", desc: "Первый сложный" },
+            hard_all: { name: "Сложные — все!", desc: "Все сложные" },
+            first_skin: { name: "Модник", desc: "Первый скин" },
+            rich: { name: "Богач", desc: "500 монет" },
+            very_rich: { name: "Очень богат", desc: "1000 монет" },
+            creator: { name: "Создатель", desc: "Свой уровень" },
+            creator5: { name: "Мастер-строитель", desc: "5 уровней" },
+            expert_first: { name: "Эксперт", desc: "Экспертный уровень" },
+            expert_all: { name: "Гроссмейстер", desc: "Все экспертные" },
+            daily: { name: "Верный игрок", desc: "Ежедневный бонус" }
+        },
+        achReceived: "✓ Получено",
+        statLabels: {
+            levelsDone: "Уровней", total: "Всего",
+            coinsNow: "🪙 Сейчас", coinsEarned: "🪙 Заработано",
+            achCount: "🏆 Достижений", ownLevels: "🛠 Своих",
+            attempts: "Попыток", firstTry: "С 1-й попытки",
+            timeInGame: "В игре", favFormula: "Любимая"
+        },
+        minutes: "мин",
+        tutSteps: [
+            { title: "🗺 Карта координат", text: "В центре — (0,0). Вправо/вверх — плюс, влево/вниз — минус." },
+            { title: "⚙️ Что такое f(x)?", text: "Функция — правило: даёшь x — получаешь y." },
+            { title: "🪄 Примеры", text: "<strong>f(x)=x</strong> — прямая, <strong>x^2</strong> — чаша, <strong>abs(x)</strong> — галочка, <strong>sin(x)</strong> — волна." },
+            { title: "🎯 Цели и препятствия", text: "Зелёные цели. Красные препятствия нельзя касаться." },
+            { title: "👆 Тап по графику", text: "Тапни по любой точке — увидишь координаты." },
+            { title: "🪙 Монеты", text: "За уровень дают монеты один раз. Ежедневно заходи за бонусом 🎁." },
+            { title: "🏆 Достижения", text: "Выполняй задания — получай награды." },
+            { title: "🎨 Кастомизация", text: "Купи скины или создай свой цвет." },
+            { title: "📤 Экспорт", text: "Поделись уровнями через JSON." },
+            { title: "🚀 Вперёд!", text: "Удачи!" }
+        ],
+        tutStep: (n, total) => `Шаг ${n} из ${total}`,
+        toastInsufficient: "Недостаточно монет 🪙",
+        toastBought: (name) => `Куплено: ${name} 🎉`,
+        toastBonusActivated: "×2 монеты на 5 уровней! 💰",
+        toastApplied: "Применено ✓", toastLevelSaved: "Уровень сохранён ✓",
+        toastLevelDeleted: "Удалён 🗑️", toastSkinSaved: "Скин сохранён ✓",
+        toastCopied: "Скопировано 📋", toastCopyError: "Ошибка",
+        toastNoLevels: "Нет уровней", toastInsertJSON: "Вставь JSON",
+        toastImported: (n) => `Импортировано: ${n} 📥`,
+        toastImportError: (e) => `❌ ${e}`,
+        toastNotEnough: (n) => `🔒 Ещё ${n}`,
+        toastNeedBuySkin: "Купи «Мой цвет»",
+        toastDailyClaimed: "+100 монет! 🎁",
+        toastAllTargetsHit: "🎯 Все цели задеты!",
+        toastTargetModeOn: "Тапни — поставится цель",
+        toastTargetModeOff: "Режим целей выкл",
+        targetsModeOn: "🎯 Цели: вкл", targetsModeOff: "🎯 Цели: выкл",
+        confirmDelete: (name) => `Удалить «${name}»?`,
+        confirmReset1: "Сбросить ВЕСЬ прогресс?",
+        confirmReset2: "Точно-точно?",
+        confirmContinueSession: "Продолжить с сохранённой формулы?"
+    },
+    en: {
+        playLevels: "🎮 Play Levels", shop: "🛒 Shop",
+        expertLevels: "🧠 Expert Levels", tutorial: "📖 Tutorial",
+        editor: "🛠 Editor", calculator: "📈 Calculator",
+        settings: "⚙️ Settings", chooseLevel: "Choose Level",
+        backMenu: "← Menu", backHome: "🏠 Back", menuShort: "Menu",
+        backList: "🏠 To list", calculatorShort: "Calc",
+        myLevels: "My Levels", createLevel: "+ Create",
+        addFunction: "+ Add", skip: "Skip", prev: "Back",
+        next: "Next →", start: "Start! 🎉", prevLevel: "← Prev",
+        nextLevel: "Next →", toLevels: "🏠 Levels", retry: "🔁 Retry",
+        yourSolution: "Your solution", received: "Received:",
+        alreadyDone: "0 (done)", darkTheme: "🌙 Dark",
+        lightTheme: "☀️ Light", achievements: "🏆 Achievements",
+        stats: "📊 Stats", mySkin: "🎨 My Skin",
+        exportImport: "📤 Export / 📥 Import",
+        resetAll: "🗑 Reset all",
+        skinDesc: "Choose color and width", thickness: "Width",
+        save: "Save", clear: "Clear",
+        exportDesc: "Copy JSON.",
+        exportBtn: "📤 Export", importBtn: "📥 Import", copyBtn: "📋 Copy",
+        levelName: "Name:", editorHint: "Pick a tool and tap.",
+        toolTarget: "🟢 1. Target", toolRect: "🟥 2. Rect",
+        toolCircle: "🔴 3. Circle", toolLine: "➖ 4. Line",
+        toolEraser: "🧽 5. Eraser",
+        dailyTitle: "Daily Bonus!", dailyDesc: "Come back every day.",
+        dailyClaim: "Claim!",
+        statusEnter: "Enter function", statusSyntaxError: "❌ Syntax",
+        statusHitObstacle: "❌ Obstacle!", statusPassed: "🎉 Passed!",
+        statusAlreadyDone: "🎉 Done", statusGoalMissed: "✍️ Missed",
+        statusTargetsProgress: (n, total) => `🎯 ${n}/${total}`,
+        categoryEasy: "🟢 Easy", categoryMedium: "🟡 Medium",
+        categoryHard: "🔴 Hard", categoryExpert: "🧠 Expert",
+        categoryCustom: "🟣 Yours",
+        lockedHint: "Complete previous",
+        passedBadge: "✓ passed", noCustomLevels: "No levels",
+        hintFooter: "<strong>Hint:</strong> <code>x^2</code>, <code>sin(x)</code>, <code>sqrt(x)</code>, <code>abs(x)</code>.",
+        shopItems: {
+            skin_gold: { name: "Golden", desc: "Gold" },
+            skin_neon: { name: "Neon", desc: "Bright" },
+            skin_fire: { name: "Fire", desc: "Hot!" },
+            skin_rainbow: { name: "Rainbow", desc: "Colorful" },
+            theme_dark: { name: "Dark", desc: "Easy on eyes" },
+            bonus_double: { name: "×2 Coins", desc: "5 levels" },
+            custom_skin: { name: "My Color", desc: "Custom" }
+        },
+        shopBuy: "Buy", shopNeed: "Need", shopWear: "Wear",
+        shopWorn: "✓ Worn", shopCustomize: "🎨 Custom",
+        achNames: {
+            first_step: { name: "First Step", desc: "First level" },
+            easy_master: { name: "Easy Start", desc: "5 easy" },
+            easy_all: { name: "Easy all!", desc: "All easy" },
+            medium_half: { name: "Halfway", desc: "5 medium" },
+            medium_all: { name: "Medium all!", desc: "All medium" },
+            hard_first: { name: "Hard", desc: "First hard" },
+            hard_all: { name: "Hard all!", desc: "All hard" },
+            first_skin: { name: "Fashion", desc: "First skin" },
+            rich: { name: "Rich", desc: "500 coins" },
+            very_rich: { name: "Very Rich", desc: "1000" },
+            creator: { name: "Creator", desc: "Your level" },
+            creator5: { name: "Builder", desc: "5 levels" },
+            expert_first: { name: "Expert", desc: "Expert level" },
+            expert_all: { name: "Grandmaster", desc: "All expert" },
+            daily: { name: "Loyal", desc: "Daily bonus" }
+        },
+        achReceived: "✓ Received",
+        statLabels: {
+            levelsDone: "Levels", total: "Total",
+            coinsNow: "🪙 Now", coinsEarned: "🪙 Earned",
+            achCount: "🏆 Ach", ownLevels: "🛠 Yours",
+            attempts: "Attempts", firstTry: "First try",
+            timeInGame: "Time", favFormula: "Fav"
+        },
+        minutes: "min",
+        tutSteps: [
+            { title: "🗺 Map", text: "Center is (0,0)." },
+            { title: "⚙️ f(x)?", text: "Rule: give x — get y." },
+            { title: "🪄 Examples", text: "<strong>x</strong>, <strong>x^2</strong>, <strong>abs(x)</strong>, <strong>sin(x)</strong>." },
+            { title: "🎯 Targets", text: "Green targets. Red obstacles." },
+            { title: "👆 Tap", text: "Tap graph to see coordinates." },
+            { title: "🪙 Coins", text: "Once per level. Daily bonus 🎁." },
+            { title: "🏆 Achievements", text: "Complete tasks." },
+            { title: "🎨 Custom", text: "Buy or create skins." },
+            { title: "📤 Export", text: "Share levels." },
+            { title: "🚀 Go!", text: "Good luck!" }
+        ],
+        tutStep: (n, total) => `Step ${n}/${total}`,
+        toastInsufficient: "Not enough coins 🪙",
+        toastBought: (name) => `Bought: ${name} 🎉`,
+        toastBonusActivated: "×2 coins for 5 levels! 💰",
+        toastApplied: "Applied ✓", toastLevelSaved: "Saved ✓",
+        toastLevelDeleted: "Deleted 🗑️", toastSkinSaved: "Skin saved ✓",
+        toastCopied: "Copied 📋", toastCopyError: "Error",
+        toastNoLevels: "No levels", toastInsertJSON: "Paste JSON",
+        toastImported: (n) => `Imported: ${n} 📥`,
+        toastImportError: (e) => `❌ ${e}`,
+        toastNotEnough: (n) => `🔒 ${n} more`,
+        toastNeedBuySkin: "Buy \"My Color\"",
+        toastDailyClaimed: "+100 coins! 🎁",
+        toastAllTargetsHit: "🎯 All hit!",
+        toastTargetModeOn: "Tap to place target",
+        toastTargetModeOff: "Target mode off",
+        targetsModeOn: "🎯 On", targetsModeOff: "🎯 Off",
+        confirmDelete: (name) => `Delete "${name}"?`,
+        confirmReset1: "Reset all progress?",
+        confirmReset2: "Sure?",
+        confirmContinueSession: "Continue with saved formula?"
+    }
+};
+
+let currentLang = loadJSON('ggb_lang', null) || (navigator.language && navigator.language.startsWith('ru') ? 'ru' : 'en');
+function t(key) { return I18N[currentLang][key] !== undefined ? I18N[currentLang][key] : key; }
+
+function applyTranslations() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const val = I18N[currentLang][el.getAttribute('data-i18n')];
+        if (typeof val === 'string') el.textContent = val;
+    });
+    document.getElementById('langBtnRu').classList.toggle('active', currentLang === 'ru');
+    document.getElementById('langBtnEn').classList.toggle('active', currentLang === 'en');
+    document.getElementById('dailyTitle').textContent = t('dailyTitle');
+    document.getElementById('dailyDesc').textContent = t('dailyDesc');
+    document.getElementById('gameHintFooter').innerHTML = t('hintFooter');
+    document.getElementById('yourSolutionLabel').textContent = t('yourSolution');
+    document.getElementById('receivedLabel').textContent = t('received');
+    document.getElementById('completeTitleText').textContent = t('statusPassed');
+    const calcBtn = document.getElementById('freeCalcModeBtn');
+    if (calcBtn) calcBtn.textContent = freeCalcTargetMode ? t('targetsModeOn') : t('targetsModeOff');
+    updateThemeButton();
+    updateCoinDisplays();
+}
+function setLanguage(lang) {
+    if (lang !== 'ru' && lang !== 'en') return;
+    currentLang = lang;
+    saveJSON('ggb_lang', lang);
+    applyTranslations();
+    if (document.getElementById('levelsScreen').classList.contains('active')) renderLevelsList();
+    if (document.getElementById('expertScreen').classList.contains('active')) renderExpertList();
+    if (document.getElementById('editorMenuScreen').classList.contains('active')) renderCustomLevelsList();
+    if (document.getElementById('shopScreen').classList.contains('active')) renderShop();
+}
+
+/* ============================================================
+   CONFIG
+============================================================ */
+const CONFIG = {
+    DEFAULT_SCALE: 30, MIN_SCALE: 5, MAX_SCALE: 800, ZOOM_STEP: 1.25,
+    HIT_CHECK_STEP: 2, LINE_HIT_RADIUS_PX: 20, JUMP_THRESHOLD: 2000,
+    COLORS: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#7c3aed'],
+    GRID_COLOR: '#f1f5f9', AXIS_COLOR: '#cbd5e1', LABEL_COLOR: '#64748b',
+    OBSTACLE_FILL: 'rgba(239,68,68,0.18)', OBSTACLE_STROKE: '#ef4444',
+    TARGET_FILL: 'rgba(16,185,129,0.25)', TARGET_STROKE: '#10b981',
+    FUNCTION_COLOR: '#4f46e5', LINE_THICKNESS: 0.15,
+    VICTORY_DURATION: 2000, VICTORY_NEON: '#00d4ff',
+    UNLOCK: { medium: { from: 'easy', needed: 5 }, hard: { from: 'medium', needed: 5 } }
+};
+const REWARDS = { easy: 25, medium: 60, hard: 120, expert: 200, custom: 40 };
+
+const STORAGE_KEYS = {
+    COINS: 'ggb_coins', COMPLETED: 'ggb_completed_levels',
+    CUSTOM: 'ggb_custom_levels', INVENTORY: 'ggb_inventory',
+    EQUIPPED: 'ggb_equipped', DAILY: 'ggb_daily_bonus',
+    ACHIEVEMENTS: 'ggb_achievements', STATS: 'ggb_stats',
+    DARK: 'ggb_dark_theme', EXPERT_DONE: 'ggb_expert_done',
+    SESSION: 'ggb_session', CUSTOM_SKIN: 'ggb_custom_skin',
+    BONUS_DOUBLE: 'ggb_bonus_double', LANG: 'ggb_lang',
+    NICK: 'ggb_nickname', MATCH_HISTORY: 'ggb_match_history'
+};
+
+function loadJSON(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+let playerData = {
+    coins: loadJSON(STORAGE_KEYS.COINS, 0),
+    completed: loadJSON(STORAGE_KEYS.COMPLETED, []),
+    expertDone: loadJSON(STORAGE_KEYS.EXPERT_DONE, []),
+    inventory: loadJSON(STORAGE_KEYS.INVENTORY, []),
+    equipped: loadJSON(STORAGE_KEYS.EQUIPPED, { skin: 'default', theme: 'default' }),
+    achievements: loadJSON(STORAGE_KEYS.ACHIEVEMENTS, []),
+    stats: loadJSON(STORAGE_KEYS.STATS, { totalEarned: 0, levelsPlayed: 0, formulas: [], firstTryWins: 0, playTimeMs: 0, startedAt: Date.now() }),
+    customSkin: loadJSON(STORAGE_KEYS.CUSTOM_SKIN, { color: '#4f46e5', width: 3 })
+};
+let activeBonusDouble = loadJSON(STORAGE_KEYS.BONUS_DOUBLE, 0);
+let darkTheme = loadJSON(STORAGE_KEYS.DARK, false);
+
+if (darkTheme && !playerData.inventory.includes('theme_dark')) {
+    darkTheme = false; saveJSON(STORAGE_KEYS.DARK, false);
+}
+
+function savePlayer() {
+    saveJSON(STORAGE_KEYS.COINS, playerData.coins);
+    saveJSON(STORAGE_KEYS.COMPLETED, playerData.completed);
+    saveJSON(STORAGE_KEYS.EXPERT_DONE, playerData.expertDone);
+    saveJSON(STORAGE_KEYS.INVENTORY, playerData.inventory);
+    saveJSON(STORAGE_KEYS.EQUIPPED, playerData.equipped);
+    saveJSON(STORAGE_KEYS.ACHIEVEMENTS, playerData.achievements);
+    saveJSON(STORAGE_KEYS.STATS, playerData.stats);
+    saveJSON(STORAGE_KEYS.CUSTOM_SKIN, playerData.customSkin);
+}
+
+/* ============================================================
+   ACHIEVEMENTS
+============================================================ */
+const ACHIEVEMENTS = [
+    { id: 'first_step', icon: '👶', reward: 50, check: p => p.completed.length >= 1 },
+    { id: 'easy_master', icon: '🟢', reward: 75, check: p => countCompletedInCategory('easy') >= 5 },
+    { id: 'easy_all', icon: '✅', reward: 150, check: p => countCompletedInCategory('easy') >= 10 },
+    { id: 'medium_half', icon: '🟡', reward: 120, check: p => countCompletedInCategory('medium') >= 5 },
+    { id: 'medium_all', icon: '🎯', reward: 250, check: p => countCompletedInCategory('medium') >= 10 },
+    { id: 'hard_first', icon: '🔴', reward: 100, check: p => countCompletedInCategory('hard') >= 1 },
+    { id: 'hard_all', icon: '🏅', reward: 500, check: p => countCompletedInCategory('hard') >= 10 },
+    { id: 'first_skin', icon: '✨', reward: 50, check: p => p.inventory.some(id => id.startsWith('skin_')) },
+    { id: 'rich', icon: '💰', reward: 100, check: p => p.coins >= 500 },
+    { id: 'very_rich', icon: '💎', reward: 200, check: p => p.coins >= 1000 },
+    { id: 'creator', icon: '🛠', reward: 75, check: p => getCustomLevels().length >= 1 },
+    { id: 'creator5', icon: '🏗', reward: 200, check: p => getCustomLevels().length >= 5 },
+    { id: 'expert_first', icon: '🧠', reward: 200, check: p => p.expertDone.length >= 1 },
+    { id: 'expert_all', icon: '👑', reward: 1000, check: p => p.expertDone.length >= 5 },
+    { id: 'daily', icon: '📅', reward: 30, check: p => loadJSON(STORAGE_KEYS.DAILY, null) !== null }
+];
+function checkAchievements() {
+    let newly = [];
+    ACHIEVEMENTS.forEach(ach => {
+        if (playerData.achievements.includes(ach.id)) return;
+        if (ach.check(playerData)) {
+            playerData.achievements.push(ach.id);
+            playerData.coins += ach.reward;
+            newly.push(ach);
+        }
+    });
+    if (newly.length > 0) {
+        savePlayer(); updateCoinDisplays();
+        newly.forEach((ach, i) => setTimeout(() => showToast(`🏆 ${t('achNames')[ach.id].name}! +${ach.reward} 🪙`, 'reward'), i * 800));
+    }
+}
+
+/* ============================================================
+   DAILY
+============================================================ */
+function checkDailyBonus() {
+    const last = loadJSON(STORAGE_KEYS.DAILY, null);
+    const now = Date.now();
+    if (!last || (now - last) >= 24 * 60 * 60 * 1000) openModal('dailyBonusModal');
+}
+function claimDailyBonus() {
+    saveJSON(STORAGE_KEYS.DAILY, Date.now());
+    playerData.coins += 100;
+    playerData.stats.totalEarned += 100;
+    savePlayer(); updateCoinDisplays();
+    closeModal('dailyBonusModal');
+    showToast(t('toastDailyClaimed'), 'reward');
+    checkAchievements();
+}
+
+/* ============================================================
+   SHOP
+============================================================ */
+const SHOP_ITEMS = [
+    { id: 'skin_gold', type: 'skin', icon: '✨', price: 80, preview: { color: '#f59e0b', width: 4 } },
+    { id: 'skin_neon', type: 'skin', icon: '💚', price: 120, preview: { color: '#22c55e', width: 4 } },
+    { id: 'skin_fire', type: 'skin', icon: '🔥', price: 180, preview: { color: '#ef4444', width: 5 } },
+    { id: 'skin_rainbow', type: 'skin', icon: '🌈', price: 350, preview: { color: 'linear-gradient(90deg,#ef4444,#f59e0b,#10b981,#3b82f6,#8b5cf6)', width: 5 } },
+    { id: 'theme_dark', type: 'theme', icon: '🌙', price: 150, preview: { bg: '#0f172a', color: '#e2e8f0' } },
+    { id: 'bonus_double', type: 'bonus', icon: '💰', price: 250, consumable: true },
+    { id: 'custom_skin', type: 'custom_skin', icon: '🎨', price: 200 }
+];
+function openShop() { showScreen('shopScreen'); renderShop(); }
+function renderShop() {
+    const c = document.getElementById('shopContainer');
+    c.innerHTML = '';
+    SHOP_ITEMS.forEach(item => {
+        const meta = t('shopItems')[item.id];
+        const owned = playerData.inventory.includes(item.id);
+        const equipped = (item.type === 'skin' && playerData.equipped.skin === item.id) || (item.type === 'theme' && playerData.equipped.theme === item.id);
+        const canAfford = playerData.coins >= item.price;
+        const div = document.createElement('div');
+        div.className = 'shop-item' + (owned && !item.consumable ? ' owned' : '');
+        let prev = '';
+        if (item.type === 'skin') prev = `<div class="item-preview"><div class="preview-line" style="background:${item.preview.color}; height:${item.preview.width}px;"></div></div>`;
+        else if (item.type === 'theme') prev = `<div class="item-preview" style="background:${item.preview.bg}; color:${item.preview.color};">Aa 123</div>`;
+        else prev = `<div class="item-preview" style="font-size:1.4rem;">${item.icon}</div>`;
+        let btn;
+        if (item.consumable) btn = canAfford ? `<button class="buy-btn affordable" onclick="buyItem('${item.id}')">${t('shopBuy')} · 🪙 ${item.price}</button>` : `<button class="buy-btn expensive" disabled>${t('shopNeed')} 🪙 ${item.price}</button>`;
+        else if (owned) {
+            if (item.type === 'custom_skin') btn = `<button class="buy-btn equip-btn" onclick="openSkinCustomizer()">${t('shopCustomize')}</button>`;
+            else if (equipped) btn = `<button class="buy-btn equipped-btn" disabled>${t('shopWorn')}</button>`;
+            else btn = `<button class="buy-btn equip-btn" onclick="equipItem('${item.id}', '${item.type}')">${t('shopWear')}</button>`;
+        } else btn = canAfford ? `<button class="buy-btn affordable" onclick="buyItem('${item.id}')">${t('shopBuy')} · 🪙 ${item.price}</button>` : `<button class="buy-btn expensive" disabled>${t('shopNeed')} 🪙 ${item.price}</button>`;
+        div.innerHTML = `<div class="item-icon">${item.icon}</div><h4>${meta.name}</h4><div class="item-desc">${meta.desc}</div>${prev}${btn}`;
+        c.appendChild(div);
+    });
+}
+function buyItem(id) {
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    if (!item || playerData.coins < item.price) { showToast(t('toastInsufficient')); return; }
+    playerData.coins -= item.price;
+    if (item.consumable) {
+        if (id === 'bonus_double') { activeBonusDouble += 5; saveJSON(STORAGE_KEYS.BONUS_DOUBLE, activeBonusDouble); showToast(t('toastBonusActivated'), 'reward'); }
+    } else {
+        playerData.inventory.push(id);
+        showToast(t('toastBought')(t('shopItems')[id].name), 'reward');
+        if (item.type === 'skin') playerData.equipped.skin = id;
+        if (item.type === 'theme') { playerData.equipped.theme = id; darkTheme = (id === 'theme_dark'); applyTheme(); }
+    }
+    savePlayer(); renderShop(); updateCoinDisplays(); checkAchievements();
+}
+function equipItem(id, type) {
+    if (type === 'skin') playerData.equipped.skin = id;
+    else if (type === 'theme') { playerData.equipped.theme = id; darkTheme = (id === 'theme_dark'); applyTheme(); }
+    savePlayer(); renderShop(); updateCoinDisplays();
+    showToast(t('toastApplied'));
+    if (socket && socket.connected) socket.emit('set_skin', { skin: { id: playerData.equipped.skin, color: getFunctionColor(), width: getFunctionWidth() } });
+}
+function getFunctionColor() {
+    const skinId = playerData.equipped.skin;
+    const skin = SHOP_ITEMS.find(i => i.id === skinId);
+    if (skin && skin.preview && skin.preview.color && !skin.preview.color.includes('gradient')) return skin.preview.color;
+    return playerData.customSkin.color;
+}
+function getFunctionWidth() {
+    const skinId = playerData.equipped.skin;
+    const skin = SHOP_ITEMS.find(i => i.id === skinId);
+    if (skin && skin.preview && skin.preview.width) return skin.preview.width;
+    return playerData.customSkin.width;
+}
+
+/* ============================================================
+   CUSTOM SKIN
+============================================================ */
+const SKIN_COLORS = ['#4f46e5','#10b981','#f59e0b','#ef4444','#7c3aed','#06b6d4','#ec4899','#0f172a'];
+function openSkinCustomizer() {
+    if (!playerData.inventory.includes('custom_skin')) { showToast(t('toastNeedBuySkin')); return; }
+    const palette = document.getElementById('colorPalette');
+    palette.innerHTML = '';
+    SKIN_COLORS.forEach(col => {
+        const sw = document.createElement('div');
+        sw.className = 'color-swatch' + (col === playerData.customSkin.color ? ' selected' : '');
+        sw.style.background = col;
+        sw.onclick = () => { playerData.customSkin.color = col; playerData.equipped.skin = 'custom'; document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected')); sw.classList.add('selected'); updateSkinPreview(); };
+        palette.appendChild(sw);
+    });
+    const sl = document.getElementById('widthSlider');
+    sl.value = playerData.customSkin.width;
+    document.getElementById('widthValue').textContent = playerData.customSkin.width;
+    sl.oninput = () => { document.getElementById('widthValue').textContent = sl.value; updateSkinPreview(); };
+    updateSkinPreview();
+    openModal('skinCustomizerModal');
+}
+function updateSkinPreview() {
+    const line = document.getElementById('skinPreviewLine');
+    line.style.background = playerData.customSkin.color;
+    line.style.height = playerData.customSkin.width + 'px';
+}
+function saveSkinCustomization() {
+    playerData.customSkin.width = parseInt(document.getElementById('widthSlider').value);
+    playerData.equipped.skin = 'custom';
+    savePlayer(); closeModal('skinCustomizerModal');
+    showToast(t('toastSkinSaved'));
+    if (currentLevel) plotFunction();
+    drawFreeCalculator();
+    if (socket && socket.connected) socket.emit('set_skin', { skin: { id: 'custom', color: getFunctionColor(), width: getFunctionWidth() } });
+}
+
+/* ============================================================
+   EXPORT/IMPORT
+============================================================ */
+function openExportImport() { openModal('exportImportModal'); }
+function exportLevels() {
+    const custom = getCustomLevels();
+    if (custom.length === 0) { showToast(t('toastNoLevels')); return; }
+    document.getElementById('exportArea').value = JSON.stringify({ version: 1, levels: custom }, null, 2);
+}
+function importLevels() {
+    const text = document.getElementById('exportArea').value.trim();
+    if (!text) { showToast(t('toastInsertJSON')); return; }
+    try {
+        const parsed = JSON.parse(text);
+        const incoming = parsed.levels || parsed;
+        if (!Array.isArray(incoming)) throw new Error('Not array');
+        const custom = getCustomLevels();
+        let added = 0;
+        incoming.forEach(lvl => { if (lvl && lvl.name && (lvl.target || lvl.targets)) { lvl.name = lvl.name + ' (import)'; custom.push(lvl); added++; } });
+        setCustomLevels(custom);
+        showToast(t('toastImported')(added));
+        closeModal('exportImportModal'); renderCustomLevelsList();
+    } catch (e) { showToast(t('toastImportError')(e.message)); }
+}
+function copyExport() {
+    const t2 = document.getElementById('exportArea');
+    if (!t2.value) exportLevels();
+    t2.select();
+    try { document.execCommand('copy'); showToast(t('toastCopied')); } catch (e) { showToast(t('toastCopyError')); }
+}
+
+/* ============================================================
+   STATS
+============================================================ */
+function openStats() { openModal('statsModal'); renderStats(); }
+function renderStats() {
+    const stats = playerData.stats;
+    const totalLevels = levelCategories.reduce((s, c) => s + c.levels.length, 0) + expertLevels.length;
+    const done = playerData.completed.length + playerData.expertDone.length;
+    const minutes = Math.floor(stats.playTimeMs / 60000);
+    const fav = getMostFrequent(stats.formulas);
+    const labels = t('statLabels');
+    const items = [
+        { v: done, l: labels.levelsDone }, { v: `/${totalLevels}`, l: labels.total },
+        { v: playerData.coins, l: labels.coinsNow }, { v: stats.totalEarned, l: labels.coinsEarned },
+        { v: playerData.achievements.length, l: labels.achCount }, { v: getCustomLevels().length, l: labels.ownLevels },
+        { v: stats.levelsPlayed, l: labels.attempts }, { v: stats.firstTryWins, l: labels.firstTry },
+        { v: minutes + ' ' + t('minutes'), l: labels.timeInGame }, { v: fav || '—', l: labels.favFormula }
+    ];
+    document.getElementById('statsContainer').innerHTML = items.map(i => `<div class="stat-card"><div class="stat-value">${i.v}</div><div class="stat-label">${i.l}</div></div>`).join('');
+}
+function getMostFrequent(arr) {
+    if (!arr.length) return '';
+    const counts = {};
+    arr.forEach(x => counts[x] = (counts[x] || 0) + 1);
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+}
+
+/* ============================================================
+   ACHIEVEMENTS UI
+============================================================ */
+function openAchievements() { openModal('achievementsModal'); renderAchievements(); }
+function renderAchievements() {
+    const c = document.getElementById('achievementsContainer');
+    c.innerHTML = '';
+    ACHIEVEMENTS.forEach(ach => {
+        const unlocked = playerData.achievements.includes(ach.id);
+        const names = t('achNames')[ach.id] || { name: ach.id, desc: '' };
+        const div = document.createElement('div');
+        div.className = 'ach-card ' + (unlocked ? 'unlocked' : 'locked');
+        div.innerHTML = `<div class="ach-icon">${unlocked ? ach.icon : '🔒'}</div><div class="ach-info"><h4>${names.name}</h4><p>${names.desc}</p><div class="ach-reward">${unlocked ? t('achReceived') : '🪙 +' + ach.reward}</div></div>`;
+        c.appendChild(div);
+    });
+}
+
+/* ============================================================
+   THEME
+============================================================ */
+function applyTheme() {
+    document.body.classList.toggle('dark', darkTheme);
+    document.documentElement.style.colorScheme = darkTheme ? 'dark' : 'light';
+    updateThemeButton();
+}
+function updateThemeButton() {
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = darkTheme ? t('lightTheme') : t('darkTheme');
+}
+function toggleDarkTheme() {
+    darkTheme = !darkTheme;
+    saveJSON(STORAGE_KEYS.DARK, darkTheme);
+    applyTheme();
+    if (currentLevel) plotFunction();
+    drawFreeCalculator();
+    drawEditor();
+}
+function resetProgress() {
+    if (!confirm(t('confirmReset1'))) return;
+    if (!confirm(t('confirmReset2'))) return;
+    Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+    location.reload();
+}
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+/* ============================================================
+   TOAST
+============================================================ */
+let toastTimer = null;
+function showToast(text, type = '') {
+    const t2 = document.getElementById('toast');
+    t2.textContent = text;
+    t2.className = 'toast ' + type;
+    t2.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t2.classList.remove('show'), 2400);
+}
+
+/* ============================================================
+   PARSER
+============================================================ */
+const FORMULA_PATTERNS = [
+    [/\bsin\b/g, 'Math.sin'], [/\bcos\b/g, 'Math.cos'], [/\btan\b/g, 'Math.tan'],
+    [/\bsqrt\b/g, 'Math.sqrt'], [/\babs\b/g, 'Math.abs'], [/\blog\b/g, 'Math.log'],
+    [/\bexp\b/g, 'Math.exp'], [/\bpi\b/g, 'Math.PI'], [/\^/g, '**']
+];
+function parseFormula(raw) {
+    let s = raw;
+    for (const [re, rep] of FORMULA_PATTERNS) s = s.replace(re, rep);
+    return s;
+}
+function compileFunction(raw) {
+    try { const fn = new Function('x', 'return ' + parseFormula(raw) + ';'); fn(1); return fn; }
+    catch (e) { return null; }
+}
+
+/* ============================================================
+   GEOMETRY
+============================================================ */
+function worldToScreen(mx, my, ox, oy, s) { return { x: ox + mx * s, y: oy - my * s }; }
+function screenToWorld(px, py, ox, oy, s) { return { x: (px - ox) / s, y: (oy - py) / s }; }
+function distanceToSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1, lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+    let t2 = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t2 = Math.max(0, Math.min(1, t2));
+    return Math.hypot(px - (x1 + t2 * dx), py - (y1 + t2 * dy));
+}
+function getTargets(level) {
+    if (level.targets) return level.targets;
+    if (level.target) return [level.target];
+    return [];
+}
+
+let victoryAnimStart = null;
+
+/* ============================================================
+   DRAWING
+============================================================ */
+function drawLinePath(ctx, fn, ox, oy, scale, w, h) {
+    let drawing = false, prevPy = 0;
+    const PAD = CONFIG.JUMP_THRESHOLD, JUMP = CONFIG.JUMP_THRESHOLD;
+    for (let px = 0; px <= w; px += 1) {
+        const mx = (px - ox) / scale;
+        let my;
+        try { my = fn(mx); } catch (e) { drawing = false; continue; }
+        if (isNaN(my) || !isFinite(my)) { drawing = false; continue; }
+        const py = oy - my * scale;
+        if (drawing && Math.abs(py - prevPy) > JUMP) drawing = false;
+        const c = Math.max(-PAD, Math.min(h + PAD, py));
+        if (!drawing) { ctx.moveTo(px, c); drawing = true; } else ctx.lineTo(px, c);
+        prevPy = py;
+    }
+}
+function drawFunctionLine(ctx, fn, ox, oy, scale, color, width, w, h) {
+    const isVictory = victoryAnimStart !== null;
+    if (isVictory) {
+        const elapsed = Date.now() - victoryAnimStart;
+        const progress = Math.min(elapsed / CONFIG.VICTORY_DURATION, 1);
+        const pulse = Math.sin(progress * Math.PI * 6);
+        const intensity = Math.abs(pulse);
+        ctx.save();
+        ctx.shadowColor = CONFIG.VICTORY_NEON;
+        ctx.shadowBlur = 25 + intensity * 25;
+        ctx.strokeStyle = `rgba(0, 212, 255, ${0.4 + intensity * 0.5})`;
+        ctx.lineWidth = width + 6 + intensity * 6;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); drawLinePath(ctx, fn, ox, oy, scale, w, h); ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.shadowColor = CONFIG.VICTORY_NEON;
+        ctx.shadowBlur = 12 + intensity * 10;
+        ctx.strokeStyle = `rgba(0, 212, 255, ${0.6 + intensity * 0.4})`;
+        ctx.lineWidth = width + 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); drawLinePath(ctx, fn, ox, oy, scale, w, h); ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = color; ctx.lineWidth = width;
+        ctx.beginPath(); drawLinePath(ctx, fn, ox, oy, scale, w, h); ctx.stroke();
+        if (intensity > 0.5) {
+            ctx.strokeStyle = `rgba(255, 255, 255, ${intensity * 0.6})`;
+            ctx.lineWidth = Math.max(1, width - 1);
+            ctx.beginPath(); drawLinePath(ctx, fn, ox, oy, scale, w, h); ctx.stroke();
+        }
+    } else {
+        ctx.strokeStyle = color; ctx.lineWidth = width;
+        ctx.beginPath(); drawLinePath(ctx, fn, ox, oy, scale, w, h); ctx.stroke();
+    }
+}
+function drawObstacle(ctx, obs, ox, oy, s) {
+    ctx.fillStyle = CONFIG.OBSTACLE_FILL; ctx.strokeStyle = CONFIG.OBSTACLE_STROKE; ctx.lineWidth = 2;
+    if (!obs.type || obs.type === 'rect') {
+        const p1 = worldToScreen(obs.x1, obs.y2, ox, oy, s);
+        const w = (obs.x2 - obs.x1) * s, h = (obs.y2 - obs.y1) * s;
+        ctx.fillRect(p1.x, p1.y, w, h); ctx.strokeRect(p1.x, p1.y, w, h);
+    } else if (obs.type === 'circle') {
+        const p = worldToScreen(obs.x, obs.y, ox, oy, s);
+        ctx.beginPath(); ctx.arc(p.x, p.y, (obs.radius || 1) * s, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (obs.type === 'line') {
+        const p1 = worldToScreen(obs.x1, obs.y1, ox, oy, s);
+        const p2 = worldToScreen(obs.x2, obs.y2, ox, oy, s);
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+        ctx.lineWidth = (obs.thickness || CONFIG.LINE_THICKNESS) * 2 * s;
+        ctx.lineCap = 'round'; ctx.stroke();
+    }
+}
+function drawGridBase(ctx, canvas, state) {
+    const { scale, offsetX, offsetY, targets, obstacles, tempPoint } = state;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const isDark = darkTheme;
+    const gridColor = isDark ? '#1e293b' : CONFIG.GRID_COLOR;
+    const axisColor = isDark ? '#475569' : CONFIG.AXIS_COLOR;
+    const labelColor = isDark ? '#94a3b8' : CONFIG.LABEL_COLOR;
+    const ox = canvas.width / 2 + offsetX, oy = canvas.height / 2 + offsetY;
+    let step = 1;
+    if (scale < 20) step = 5; if (scale < 10) step = 10;
+    if (scale > 80) step = 0.5; if (scale > 160) step = 0.2;
+    const pixelStep = step * scale;
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.beginPath();
+    const sx = ((ox % pixelStep) + pixelStep) % pixelStep;
+    for (let x = sx; x < canvas.width; x += pixelStep) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); }
+    const sy = ((oy % pixelStep) + pixelStep) % pixelStep;
+    for (let y = sy; y < canvas.height; y += pixelStep) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); }
+    ctx.stroke();
+    ctx.strokeStyle = axisColor; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(0, oy); ctx.lineTo(canvas.width, oy);
+    ctx.moveTo(ox, 0); ctx.lineTo(ox, canvas.height);
+    ctx.stroke();
+    ctx.fillStyle = labelColor; ctx.font = '11px sans-serif';
+    const minX = -ox / scale, maxX = (canvas.width - ox) / scale;
+    const minY = -(canvas.height - oy) / scale, maxY = oy / scale;
+    let lS = step; if (pixelStep < 40) lS = step * 2; if (pixelStep < 20) lS = step * 5;
+    for (let i = Math.floor(minX / lS) * lS; i <= maxX; i += lS) {
+        if (Math.abs(i) < 0.0001) continue;
+        const px = ox + i * scale;
+        if (px > 0 && px < canvas.width) { ctx.fillRect(px, oy - 3, 1, 6); ctx.fillText(Math.round(i * 100) / 100, px - 10, oy + 16); }
+    }
+    for (let j = Math.floor(minY / lS) * lS; j <= maxY; j += lS) {
+        if (Math.abs(j) < 0.0001) continue;
+        const py = oy - j * scale;
+        if (py > 0 && py < canvas.height) { ctx.fillRect(ox - 3, py, 6, 1); ctx.fillText(Math.round(j * 100) / 100, ox + 8, py + 4); }
+    }
+    if (obstacles) obstacles.forEach(o => drawObstacle(ctx, o, ox, oy, scale));
+    if (tempPoint) {
+        const p = worldToScreen(tempPoint.x, tempPoint.y, ox, oy, scale);
+        ctx.fillStyle = getFunctionColor();
+        ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+    }
+    if (targets && targets.length) {
+        targets.forEach((t2, idx) => {
+            const p = worldToScreen(t2.x, t2.y, ox, oy, scale);
+            ctx.fillStyle = CONFIG.TARGET_FILL; ctx.strokeStyle = CONFIG.TARGET_STROKE; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(p.x, p.y, t2.radius * scale, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            if (targets.length > 1) {
+                ctx.fillStyle = '#065f46'; ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center'; ctx.fillText(idx + 1, p.x, p.y + 5);
+                ctx.textAlign = 'start';
+            }
+        });
+    }
+}
+
+/* ============================================================
+   HANDLERS
+============================================================ */
+function attachHandlersWithCoords(canvas, container, redraw, scaleRef, offsetRef, getState, tooltipEl, onTapExtra) {
+    let dragging = false, lastX = 0, lastY = 0, lastDist = 0;
+    let startX = 0, startY = 0, startTime = 0, moved = false;
+    let rafId = null;
+    const TOL = 8;
+    function scheduleRedraw() { if (rafId) return; rafId = requestAnimationFrame(() => { redraw(); rafId = null; }); }
+    function getOrigin() { return { ox: canvas.width / 2 + offsetRef.x, oy: canvas.height / 2 + offsetRef.y }; }
+    function showCoordTooltip(px, py, worldX, worldY, state) {
+        if (!tooltipEl) return;
+        let tag = '', tagClass = '', dX = worldX, dY = worldY;
+        let onTarget = false;
+        (state.targets || []).forEach(t2 => {
+            if (Math.hypot(worldX - t2.x, worldY - t2.y) <= t2.radius + 0.15) {
+                dX = t2.x; dY = t2.y; tag = '🎯'; tagClass = 'on-target'; onTarget = true;
+            }
+        });
+        if (!onTarget) {
+            (state.obstacles || []).forEach(obs => {
+                let hit = false;
+                if (!obs.type || obs.type === 'rect') hit = worldX >= obs.x1 && worldX <= obs.x2 && worldY >= obs.y1 && worldY <= obs.y2;
+                else if (obs.type === 'circle') hit = Math.hypot(worldX - obs.x, worldY - obs.y) <= (obs.radius || 1);
+                else if (obs.type === 'line') hit = distanceToSegment(worldX, worldY, obs.x1, obs.y1, obs.x2, obs.y2) <= (obs.thickness || CONFIG.LINE_THICKNESS) + 0.1;
+                if (hit) { tag = '🚧'; tagClass = 'on-obstacle'; }
+            });
+        }
+        if (!onTarget && !tag && state.functions && state.functions.length) {
+            let bestDist = Infinity, bestPoint = null;
+            state.functions.forEach(fn => {
+                if (!fn) return;
+                const o = getOrigin();
+                const sStep = 1 / scaleRef.val, range = 40 / scaleRef.val;
+                for (let mx = worldX - range; mx <= worldX + range; mx += sStep) {
+                    let my; try { my = fn(mx); } catch (e) { continue; }
+                    if (!isFinite(my) || isNaN(my)) continue;
+                    const p = worldToScreen(mx, my, o.ox, o.oy, scaleRef.val);
+                    const d = Math.hypot(p.x - px, p.y - py);
+                    if (d < bestDist) { bestDist = d; bestPoint = { x: mx, y: my }; }
+                }
+            });
+            if (bestPoint && bestDist <= CONFIG.LINE_HIT_RADIUS_PX) {
+                dX = bestPoint.x; dY = bestPoint.y; tag = '📈'; tagClass = 'on-line';
+            }
+        }
+        const fmt = v => (Math.abs(Math.round(v * 100) / 100) < 0.001 ? 0 : Math.round(v * 100) / 100).toString();
+        tooltipEl.innerHTML = `(${fmt(dX)}; ${fmt(dY)})${tag ? `<span class="coord-tag ${tagClass}">${tag}</span>` : ''}`;
+        tooltipEl.style.left = px + 'px';
+        tooltipEl.style.top = py + 'px';
+        tooltipEl.classList.add('show');
+        clearTimeout(tooltipEl._t);
+        tooltipEl._t = setTimeout(() => tooltipEl.classList.remove('show'), 3000);
+    }
+    function handleTap(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const px = clientX - rect.left, py = clientY - rect.top;
+        const o = getOrigin();
+        const w = screenToWorld(px, py, o.ox, o.oy, scaleRef.val);
+        showCoordTooltip(px, py, w.x, w.y, getState());
+        if (onTapExtra) onTapExtra(w.x, w.y, px, py);
+    }
+    canvas.addEventListener('mousedown', e => { startX = e.clientX; startY = e.clientY; startTime = Date.now(); moved = false; dragging = true; lastX = e.clientX; lastY = e.clientY; });
+    window.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        if (Math.abs(e.clientX - startX) > TOL || Math.abs(e.clientY - startY) > TOL) moved = true;
+        offsetRef.x += e.clientX - lastX; offsetRef.y += e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+        scheduleRedraw();
+    });
+    window.addEventListener('mouseup', e => {
+        if (dragging && !moved && Date.now() - startTime < 400) handleTap(e.clientX, e.clientY);
+        dragging = false;
+    });
+    canvas.addEventListener('touchstart', e => {
+        if (e.touches.length === 1) { const t2 = e.touches[0]; startX = t2.clientX; startY = t2.clientY; startTime = Date.now(); moved = false; dragging = true; lastX = t2.clientX; lastY = t2.clientY; }
+        else if (e.touches.length === 2) { dragging = false; moved = true; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }
+    }, { passive: true });
+    canvas.addEventListener('touchmove', e => {
+        if (e.touches.length === 1 && dragging) {
+            const t2 = e.touches[0];
+            if (Math.abs(t2.clientX - startX) > TOL || Math.abs(t2.clientY - startY) > TOL) moved = true;
+            offsetRef.x += t2.clientX - lastX; offsetRef.y += t2.clientY - lastY;
+            lastX = t2.clientX; lastY = t2.clientY;
+            scheduleRedraw();
+        } else if (e.touches.length === 2) {
+            const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            if (lastDist > 0) scaleRef.val = Math.max(CONFIG.MIN_SCALE, Math.min(CONFIG.MAX_SCALE, scaleRef.val * (d / lastDist)));
+            lastDist = d; scheduleRedraw();
+        }
+    }, { passive: true });
+    canvas.addEventListener('touchend', e => {
+        if (e.touches.length === 0) { if (dragging && !moved && Date.now() - startTime < 400) handleTap(startX, startY); dragging = false; lastDist = 0; }
+        else if (e.touches.length === 1) { dragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; moved = true; }
+    }, { passive: true });
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        scaleRef.val = e.deltaY < 0 ? Math.min(scaleRef.val * CONFIG.ZOOM_STEP, CONFIG.MAX_SCALE) : Math.max(scaleRef.val / CONFIG.ZOOM_STEP, CONFIG.MIN_SCALE);
+        scheduleRedraw();
+    }, { passive: false });
+}
+
+/* ============================================================
+   TUTORIAL
+============================================================ */
+let currentTutStep = 0;
+function openTutorial() { currentTutStep = 0; renderTutorialStep(); openModal('tutorialModal'); }
+function closeTutorial() { closeModal('tutorialModal'); }
+function renderTutorialStep() {
+    const steps = t('tutSteps');
+    const s = steps[currentTutStep];
+    document.getElementById('tutTitle').textContent = s.title;
+    document.getElementById('tutBody').innerHTML = s.text;
+    document.getElementById('tutStepIndicator').textContent = t('tutStep')(currentTutStep + 1, steps.length);
+    document.getElementById('tutPrevBtn').style.display = currentTutStep === 0 ? 'none' : 'block';
+    document.getElementById('tutNextBtn').textContent = currentTutStep === steps.length - 1 ? t('start') : t('next');
+}
+function nextTutorialStep() {
+    const steps = t('tutSteps');
+    if (currentTutStep < steps.length - 1) { currentTutStep++; renderTutorialStep(); }
+    else closeTutorial();
+}
+function prevTutorialStep() { if (currentTutStep > 0) { currentTutStep--; renderTutorialStep(); } }
+
+/* ============================================================
+   LEVELS DATA
+============================================================ */
+const levelCategories = [
+    { categoryNameKey: "categoryEasy", className: "easy", levels: [
+        { name: "1.1", obstacles: [{ type:'rect',x1:-2,x2:0,y1:-1,y2:1 },{ type:'rect',x1:2,x2:4,y1:-1,y2:1 }], target: { x:5,y:2,radius:0.8 }, hint: "0.4 * x" },
+        { name: "1.2", obstacles: [{ type:'rect',x1:-3,x2:-1,y1:3,y2:5 },{ type:'rect',x1:1,x2:3,y1:3,y2:5 },{ type:'circle',x:0,y:0,radius:1 }], target: { x:0,y:4,radius:0.8 }, hint: "abs(x) + 1" },
+        { name: "1.3", obstacles: [{ type:'rect',x1:-1,x2:1,y1:-2,y2:0 },{ type:'circle',x:-3,y:-2,radius:1 }], targets: [{ x:-3,y:1,radius:0.7 },{ x:3,y:-1,radius:0.7 }], hint: "-0.33 * x" },
+        { name: "1.4", obstacles: [{ type:'rect',x1:-1,x2:1,y1:0,y2:3 },{ type:'rect',x1:2,x2:4,y1:-3,y2:-1 },{ type:'circle',x:-3,y:2,radius:1 }], target: { x:5,y:0,radius:0.8 }, hint: "-x + 5" },
+        { name: "1.5", obstacles: [{ type:'rect',x1:-4,x2:-2,y1:-1,y2:3 },{ type:'rect',x1:-1,x2:1,y1:-1,y2:3 },{ type:'rect',x1:2,x2:4,y1:-1,y2:3 }], target: { x:5,y:4,radius:0.8 }, hint: "0.5 * x" },
+        { name: "1.6", obstacles: [{ type:'rect',x1:-1,x2:1,y1:-3,y2:3 },{ type:'circle',x:-3,y:-3,radius:1 },{ type:'circle',x:3,y:-3,radius:1 }], targets: [{ x:-4,y:2,radius:0.7 },{ x:4,y:2,radius:0.7 }], hint: "abs(x) + 1" },
+        { name: "1.7", obstacles: [{ type:'rect',x1:0,x2:2,y1:2,y2:4 },{ type:'rect',x1:0,x2:2,y1:-2,y2:0 },{ type:'rect',x1:-3,x2:-1,y1:3,y2:5 }], target: { x:4,y:1,radius:0.8 }, hint: "0.25 * x" },
+        { name: "1.8", obstacles: [{ type:'rect',x1:-3,x2:-1,y1:0,y2:2 },{ type:'rect',x1:0,x2:2,y1:1,y2:3 },{ type:'circle',x:4,y:0,radius:1 }], target: { x:4,y:4,radius:0.8 }, hint: "0.5 * x + 1" },
+        { name: "1.9", obstacles: [{ type:'rect',x1:-3,x2:3,y1:-1,y2:1 },{ type:'circle',x:-2,y:3,radius:0.8 },{ type:'circle',x:2,y:3,radius:0.8 }], targets: [{ x:0,y:2.5,radius:0.7 },{ x:4,y:1.5,radius:0.7 }], hint: "-0.25 * x + 2.5" },
+        { name: "1.10", obstacles: [{ type:'rect',x1:-5,x2:-3,y1:2,y2:4 },{ type:'rect',x1:3,x2:5,y1:2,y2:4 },{ type:'circle',x:0,y:-2,radius:1.2 }], targets: [{ x:-2,y:3,radius:0.7 },{ x:0,y:0,radius:0.7 },{ x:2,y:3,radius:0.7 }], hint: "0.75 * x^2" }
+    ]},
+    { categoryNameKey: "categoryMedium", className: "medium", levels: [
+        { name: "2.1", obstacles: [{ type:'rect',x1:-3,x2:-1,y1:4,y2:6 },{ type:'rect',x1:1,x2:3,y1:4,y2:6 },{ type:'circle',x:0,y:0,radius:0.8 }], target: { x:0,y:2,radius:0.8 }, hint: "x^2 + 2" },
+        { name: "2.2", obstacles: [{ type:'rect',x1:-4,x2:-2,y1:4,y2:6 },{ type:'rect',x1:2,x2:4,y1:4,y2:6 },{ type:'circle',x:0,y:0,radius:1.2 }], target: { x:5,y:3,radius:0.8 }, hint: "abs(x) + 2" },
+        { name: "2.3", obstacles: [{ type:'rect',x1:-5,x2:-3,y1:-1,y2:1 },{ type:'rect',x1:3,x2:5,y1:-1,y2:1 },{ type:'circle',x:0,y:1,radius:1 }], targets: [{ x:-2,y:4,radius:0.6 },{ x:0,y:5,radius:0.6 },{ x:2,y:4,radius:0.6 }], hint: "-0.5 * x^2 + 5" },
+        { name: "2.4", obstacles: [{ type:'rect',x1:-4,x2:-2,y1:2,y2:4 },{ type:'rect',x1:2,x2:4,y1:2,y2:4 },{ type:'circle',x:0,y:3,radius:1 }], targets: [{ x:-1,y:0,radius:0.6 },{ x:1,y:0,radius:0.6 },{ x:3,y:4,radius:0.6 }], hint: "abs(x) - 1" },
+        { name: "2.5", obstacles: [{ type:'rect',x1:-1,x2:1,y1:-6,y2:4 },{ type:'circle',x:-3,y:2,radius:0.8 },{ type:'circle',x:3,y:2,radius:0.8 }], targets: [{ x:-3,y:5,radius:0.6 },{ x:3,y:5,radius:0.6 }], hint: "-x^2 + 6" },
+        { name: "2.6", obstacles: [{ type:'circle',x:-3,y:3,radius:1 },{ type:'circle',x:3,y:3,radius:1 },{ type:'circle',x:0,y:-2,radius:1.2 }], targets: [{ x:-5,y:4,radius:0.6 },{ x:5,y:4,radius:0.6 }], hint: "0.3 * x^2" },
+        { name: "2.7", obstacles: [{ type:'rect',x1:-2,x2:2,y1:3,y2:5 },{ type:'circle',x:-4,y:-2,radius:0.8 },{ type:'circle',x:4,y:-2,radius:0.8 }], targets: [{ x:-4,y:1,radius:0.6 },{ x:0,y:2,radius:0.6 },{ x:4,y:1,radius:0.6 }], hint: "-0.2 * x^2 + 2" },
+        { name: "2.8", obstacles: [{ type:'rect',x1:-5,x2:-3,y1:2,y2:5 },{ type:'rect',x1:3,x2:5,y1:2,y2:5 },{ type:'rect',x1:-1,x2:1,y1:3,y2:5 },{ type:'circle',x:0,y:-2,radius:1 }], target: { x:0,y:1,radius:0.8 }, hint: "-abs(x) + 2" },
+        { name: "2.9", obstacles: [{ type:'circle',x:-3,y:0,radius:1.5 },{ type:'circle',x:0,y:0,radius:1.5 },{ type:'circle',x:3,y:0,radius:1.5 }], targets: [{ x:0,y:3,radius:0.6 },{ x:6,y:4,radius:0.6 }], hint: "0.4 * x + 2" },
+        { name: "2.10", obstacles: [{ type:'rect',x1:-4,x2:-2,y1:4,y2:7 },{ type:'rect',x1:2,x2:4,y1:4,y2:7 },{ type:'rect',x1:-1,x2:1,y1:5,y2:7 },{ type:'circle',x:0,y:-3,radius:1.2 }], targets: [{ x:-3,y:2,radius:0.6 },{ x:0,y:2,radius:0.6 },{ x:3,y:2,radius:0.6 }], hint: "-0.1 * x^2 + 2" }
+    ]},
+    { categoryNameKey: "categoryHard", className: "hard", levels: [
+        { name: "3.1", obstacles: [{ type:'rect',x1:-6,x2:-4,y1:3,y2:5 },{ type:'rect',x1:4,x2:6,y1:3,y2:5 },{ type:'circle',x:0,y:3,radius:1 }], targets: [{ x:-3,y:1,radius:0.6 },{ x:0,y:-1,radius:0.6 },{ x:3,y:1,radius:0.6 }], hint: "1.5 * sin(x)" },
+        { name: "3.2", obstacles: [{ type:'rect',x1:1,x2:3,y1:-4,y2:2 },{ type:'circle',x:6,y:4,radius:1 },{ type:'circle',x:-2,y:-2,radius:1 }], targets: [{ x:0,y:0,radius:0.6 },{ x:5,y:2,radius:0.6 },{ x:9,y:3,radius:0.6 }], hint: "sqrt(x)" },
+        { name: "3.3", obstacles: [{ type:'rect',x1:-6,x2:-2,y1:2,y2:4 },{ type:'rect',x1:2,x2:6,y1:2,y2:4 },{ type:'rect',x1:-1,x2:1,y1:-4,y2:-2 }], targets: [{ x:-4,y:-2,radius:0.6 },{ x:0,y:0,radius:0.6 },{ x:4,y:4,radius:0.6 }], hint: "2 * cos(x)" },
+        { name: "3.4", obstacles: [{ type:'line',x1:-2,y1:4,x2:2,y2:4,thickness:0.2 },{ type:'line',x1:-5,y1:1,x2:-2,y2:1,thickness:0.2 },{ type:'circle',x:3,y:2,radius:1 }], targets: [{ x:-3,y:3,radius:0.6 },{ x:0,y:2,radius:0.6 },{ x:6,y:4,radius:0.6 }], hint: "-0.5 * abs(x - 1) + 3" },
+        { name: "3.5", obstacles: [{ type:'rect',x1:-7,x2:-5,y1:-4,y2:4 },{ type:'rect',x1:5,x2:7,y1:-4,y2:4 },{ type:'circle',x:0,y:0,radius:0.7 }], targets: [{ x:-3,y:2,radius:0.6 },{ x:0,y:-2,radius:0.6 },{ x:3,y:2,radius:0.6 }], hint: "2 * sin(2 * x)" },
+        { name: "3.6", obstacles: [{ type:'circle',x:-3,y:3,radius:1.2 },{ type:'circle',x:3,y:-3,radius:1.2 },{ type:'rect',x1:-1,x2:1,y1:-6,y2:-4 }], targets: [{ x:-4,y:-3,radius:0.6 },{ x:0,y:0,radius:0.6 },{ x:4,y:4,radius:0.6 }], hint: "0.1 * x^3" },
+        { name: "3.7", obstacles: [{ type:'line',x1:-6,y1:3,x2:-2,y2:3,thickness:0.25 },{ type:'line',x1:2,y1:3,x2:6,y2:3,thickness:0.25 },{ type:'circle',x:0,y:-2,radius:1 }], targets: [{ x:-4,y:1,radius:0.6 },{ x:0,y:1,radius:0.6 },{ x:4,y:5,radius:0.6 }], hint: "abs(sin(x)) + 1" },
+        { name: "3.8", obstacles: [{ type:'rect',x1:-6,x2:-3,y1:-4,y2:-1 },{ type:'rect',x1:3,x2:6,y1:-4,y2:-1 },{ type:'line',x1:-3,y1:4,x2:3,y2:4,thickness:0.3 }], targets: [{ x:-4,y:2,radius:0.6 },{ x:0,y:2,radius:0.6 },{ x:4,y:6,radius:0.6 }], hint: "0.3 * x^2 + 2" },
+        { name: "3.9", obstacles: [{ type:'rect',x1:-6,x2:-4,y1:1,y2:3 },{ type:'rect',x1:4,x2:6,y1:1,y2:3 },{ type:'circle',x:-2,y:-2,radius:1 },{ type:'circle',x:2,y:-2,radius:1 }], targets: [{ x:-3,y:4,radius:0.6 },{ x:0,y:0,radius:0.6 },{ x:3,y:4,radius:0.6 }], hint: "abs(x) - 1" },
+        { name: "3.10", obstacles: [{ type:'rect',x1:-8,x2:-6,y1:-5,y2:5 },{ type:'rect',x1:6,x2:8,y1:-5,y2:5 },{ type:'circle',x:0,y:3,radius:1.2 },{ type:'circle',x:-3,y:-3,radius:1 },{ type:'circle',x:3,y:-3,radius:1 }], targets: [{ x:-5,y:2,radius:0.6 },{ x:0,y:1,radius:0.6 },{ x:5,y:2,radius:0.6 }], hint: "0.15 * x^2" }
+    ]}
+];
+const expertLevels = [
+    { name: "E1", forbidden: ['^','sin','cos','sqrt','abs','tan'], maxLen: 10, obstacles: [{ type:'rect',x1:-2,x2:0,y1:-1,y2:1 },{ type:'rect',x1:2,x2:4,y1:-1,y2:1 }], target: { x:5,y:3,radius:0.8 }, hint: "0.6 * x" },
+    { name: "E2", forbidden: ['^'], maxLen: 20, obstacles: [{ type:'rect',x1:-3,x2:-1,y1:3,y2:5 },{ type:'rect',x1:1,x2:3,y1:3,y2:5 },{ type:'circle',x:0,y:0,radius:1 }], target: { x:0,y:4,radius:0.8 }, hint: "abs(x) + 1" },
+    { name: "E3", allowed: ['x','abs'], maxLen: 15, obstacles: [{ type:'rect',x1:-2,x2:2,y1:3,y2:5 },{ type:'circle',x:-4,y:-2,radius:0.8 },{ type:'circle',x:4,y:-2,radius:0.8 }], targets: [{ x:-4,y:1,radius:0.6 },{ x:0,y:2,radius:0.6 },{ x:4,y:1,radius:0.6 }], hint: "-0.5 * abs(x - 1) + 3" },
+    { name: "E4", maxLen: 8, obstacles: [{ type:'rect',x1:-5,x2:-3,y1:-1,y2:1 },{ type:'rect',x1:3,x2:5,y1:-1,y2:1 },{ type:'circle',x:0,y:1,radius:1 }], targets: [{ x:-2,y:4,radius:0.6 },{ x:0,y:5,radius:0.6 },{ x:2,y:4,radius:0.6 }], hint: "5-x^2" },
+    { name: "E5", forbidden: ['sin','cos','tan'], maxLen: 25, obstacles: [{ type:'rect',x1:-4,x2:-2,y1:4,y2:6 },{ type:'rect',x1:2,x2:4,y1:4,y2:6 },{ type:'circle',x:0,y:0,radius:1.2 }], target: { x:5,y:3,radius:0.8 }, hint: "abs(x) + 2" }
+];
+
+/* ============================================================
+   20 МУЛЬТИПЛЕЕРНЫХ УРОВНЕЙ
+============================================================ */
+const multiplayerLevels = {
+    'MP-L1': { name: 'L1', obstacles: [{ type:'rect',x1:-1,x2:1,y1:-1,y2:2 }], target: { x:3,y:2,radius:0.7 }, hint: 'прямая' },
+    'MP-L2': { name: 'L2', obstacles: [{ type:'rect',x1:0,x2:2,y1:-2,y2:0 }], target: { x:4,y:3,radius:0.7 }, hint: 'вверх' },
+    'MP-L3': { name: 'L3', obstacles: [{ type:'rect',x1:-2,x2:0,y1:1,y2:3 }], target: { x:3,y:-1,radius:0.7 }, hint: 'вниз' },
+    'MP-L4': { name: 'L4', obstacles: [{ type:'circle',x:0,y:0,radius:1 }], target: { x:4,y:2,radius:0.7 }, hint: 'обход' },
+    'MP-L5': { name: 'L5', obstacles: [{ type:'rect',x1:-3,x2:-1,y1:-1,y2:1 }], target: { x:3,y:1,radius:0.7 }, hint: '0.4*x' },
+    'MP-L6': { name: 'L6', obstacles: [{ type:'rect',x1:1,x2:3,y1:0,y2:2 }], target: { x:5,y:3,radius:0.7 }, hint: 'наклон' },
+    'MP-L7': { name: 'L7', obstacles: [{ type:'circle',x:-2,y:0,radius:0.8 }], target: { x:3,y:4,radius:0.7 }, hint: 'круто вверх' },
+    'MP-M1': { name: 'M1', obstacles: [{ type:'rect',x1:-2,x2:0,y1:2,y2:4 },{ type:'rect',x1:0,x2:2,y1:2,y2:4 }], target: { x:0,y:1,radius:0.7 }, hint: 'abs(x)' },
+    'MP-M2': { name: 'M2', obstacles: [{ type:'circle',x:0,y:-1,radius:1 }], target: { x:0,y:3,radius:0.7 }, hint: 'x^2' },
+    'MP-M3': { name: 'M3', obstacles: [{ type:'rect',x1:-2,x2:2,y1:3,y2:5 }], targets: [{ x:-3,y:1,radius:0.6 },{ x:3,y:1,radius:0.6 }], hint: 'две цели' },
+    'MP-M4': { name: 'M4', obstacles: [{ type:'circle',x:0,y:0,radius:1.2 }], target: { x:4,y:3,radius:0.7 }, hint: 'обход сверху' },
+    'MP-M5': { name: 'M5', obstacles: [{ type:'rect',x1:-1,x2:1,y1:2,y2:4 },{ type:'rect',x1:2,x2:4,y1:2,y2:4 }], target: { x:5,y:1,radius:0.7 }, hint: 'коридор' },
+    'MP-M6': { name: 'M6', obstacles: [{ type:'rect',x1:1,x2:3,y1:1,y2:3 }], target: { x:4,y:-1,radius:0.7 }, hint: 'abs(x-2)+1' },
+    'MP-M7': { name: 'M7', obstacles: [{ type:'rect',x1:-3,x2:-1,y1:2,y2:4 },{ type:'rect',x1:1,x2:3,y1:2,y2:4 }], targets: [{ x:-2,y:0,radius:0.6 },{ x:2,y:0,radius:0.6 }], hint: 'V-образно' },
+    'MP-H1': { name: 'H1', obstacles: [{ type:'rect',x1:-4,x2:-2,y1:2,y2:4 },{ type:'rect',x1:0,x2:2,y1:2,y2:4 },{ type:'rect',x1:3,x2:5,y1:2,y2:4 }], targets: [{ x:-3,y:0,radius:0.5 },{ x:1,y:0,radius:0.5 },{ x:4,y:0,radius:0.5 }], hint: 'три модуля' },
+    'MP-H2': { name: 'H2', obstacles: [{ type:'circle',x:-2,y:1,radius:0.8 },{ type:'circle',x:2,y:1,radius:0.8 }], target: { x:0,y:4,radius:0.5 }, hint: 'точная вершина' },
+    'MP-H3': { name: 'H3', obstacles: [{ type:'rect',x1:-3,x2:3,y1:3,y2:5 }], targets: [{ x:-3,y:1,radius:0.5 },{ x:0,y:0,radius:0.5 },{ x:3,y:1,radius:0.5 }], hint: 'парабола через 3' },
+    'MP-H4': { name: 'H4', obstacles: [{ type:'rect',x1:-4,x2:-2,y1:1,y2:3 },{ type:'rect',x1:-1,x2:1,y1:1,y2:3 },{ type:'rect',x1:2,x2:4,y1:1,y2:3 }], target: { x:5,y:3,radius:0.5 }, hint: 'зигзаг' },
+    'MP-H5': { name: 'H5', obstacles: [{ type:'rect',x1:-5,x2:-3,y1:2,y2:4 },{ type:'rect',x1:3,x2:5,y1:2,y2:4 },{ type:'circle',x:0,y:0,radius:1 }], targets: [{ x:-4,y:0,radius:0.5 },{ x:0,y:2,radius:0.5 },{ x:4,y:0,radius:0.5 }], hint: 'abs(abs(x)-3)-1' },
+    'MP-H6': { name: 'H6', obstacles: [{ type:'rect',x1:-3,x2:-1,y1:-2,y2:2 },{ type:'rect',x1:1,x2:3,y1:-2,y2:2 },{ type:'circle',x:0,y:3,radius:0.8 }], targets: [{ x:-4,y:2,radius:0.4 },{ x:0,y:-1,radius:0.4 },{ x:4,y:2,radius:0.4 }], hint: 'финал' }
+};
+
+/* ============================================================
+   UNLOCK
+============================================================ */
+function countCompletedInCategory(cat) {
+    const c = levelCategories.find(x => x.className === cat);
+    if (!c) return 0;
+    return c.levels.filter(l => playerData.completed.includes(l.name)).length;
+}
+function getUnlockInfo(cat) {
+    if (cat === 'easy' || cat === 'custom') return { unlocked: true, done: 0, needed: 0, fromName: '' };
+    const rule = CONFIG.UNLOCK[cat];
+    const done = countCompletedInCategory(rule.from);
+    const names = { easy: t('categoryEasy'), medium: t('categoryMedium'), hard: t('categoryHard') };
+    return { unlocked: done >= rule.needed, done, needed: rule.needed, fromName: names[rule.from] || rule.from };
+}
+
+/* ============================================================
+   STATE
+============================================================ */
+let currentLevel = null;
+let isCustomGame = false;
+let currentFlatIndex = -1;
+let flatLevels = [];
+let levelJustCompleted = false;
+let gameFunctions = [];
+let currentSessionKey = null;
+
+function getCustomLevels() { return loadJSON(STORAGE_KEYS.CUSTOM, []); }
+function setCustomLevels(a) { saveJSON(STORAGE_KEYS.CUSTOM, a); }
+function rebuildFlatLevels() {
+    flatLevels = [];
+    levelCategories.forEach(c => c.levels.forEach(l => flatLevels.push({ level: l, source: 'builtin' })));
+    expertLevels.forEach(l => flatLevels.push({ level: l, source: 'expert' }));
+    getCustomLevels().forEach(l => flatLevels.push({ level: l, source: 'custom' }));
+}
+
+/* ============================================================
+   NAVIGATION
+============================================================ */
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id === 'levelsScreen') renderLevelsList();
+    else if (id === 'expertScreen') renderExpertList();
+    else if (id === 'editorMenuScreen') renderCustomLevelsList();
+    else if (id === 'gameScreen') { resizeCanvas(); requestAnimationFrame(plotFunction); }
+    else if (id === 'freeCalcScreen') { resizeFreeCanvas(); requestAnimationFrame(drawFreeCalculator); }
+    else if (id === 'editorScreen') { resizeEditorCanvas(); initEditor(); }
+    else if (id === 'shopScreen') renderShop();
+    else if (id === 'multiplayerScreen') {
+        connectSocket();
+        const nick = loadJSON(STORAGE_KEYS.NICK, '');
+        const inp = document.getElementById('mpNickname');
+        if (inp) inp.value = nick;
+    }
+    updateCoinDisplays();
+}
+function goBackFromGame() {
+    closeLevelComplete();
+    document.getElementById('funcInput').blur();
+    document.body.classList.remove('input-focused');
+    if (isCustomGame) showScreen('editorMenuScreen');
+    else if (currentLevel && currentLevel.name.startsWith('E')) showScreen('expertScreen');
+    else showScreen('levelsScreen');
+}
+
+/* ============================================================
+   LISTS
+============================================================ */
+function renderLevelsList() {
+    const c = document.getElementById('levelsContainer');
+    c.innerHTML = '';
+    levelCategories.forEach(cat => {
+        const info = getUnlockInfo(cat.className);
+        const locked = !info.unlocked;
+        const group = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = `category-title ${cat.className}`;
+        title.textContent = t(cat.categoryNameKey);
+        if (locked) {
+            const s = document.createElement('span');
+            s.style.cssText = 'margin-left:auto; font-size:0.75rem; color: var(--text-muted); font-weight:600;';
+            s.textContent = `🔒 ${info.done}/${info.needed}`;
+            title.appendChild(s);
+        }
+        group.appendChild(title);
+        const grid = document.createElement('div');
+        grid.className = 'levels-grid';
+        cat.levels.forEach(lvl => {
+            const tc = getTargets(lvl).length;
+            const oc = lvl.obstacles ? lvl.obstacles.length : 0;
+            const done = playerData.completed.includes(lvl.name);
+            const rw = getLevelReward(lvl);
+            const card = document.createElement('div');
+            card.className = 'level-card' + (done ? ' completed' : '') + (locked ? ' locked' : '');
+            card.innerHTML = `
+                ${done ? '<div class="completed-badge">✓</div>' : ''}
+                ${locked ? '<div class="locked-badge">🔒</div>' : ''}
+                <h3>${lvl.name}</h3>
+                <p>${locked ? t('lockedHint') : lvl.hint}</p>
+                <div class="level-meta"><span>🎯 ${tc}</span><span>🚧 ${oc}</span>${locked ? '' : (done ? `<span class="reward-badge done">${t('passedBadge')}</span>` : `<span class="reward-badge">🪙 +${rw}</span>`)}</div>
+            `;
+            if (locked) card.onclick = () => showToast(t('toastNotEnough')(info.needed - info.done));
+            else card.onclick = () => { isCustomGame = false; startLevel(lvl); };
+            grid.appendChild(card);
+        });
+        group.appendChild(grid);
+        c.appendChild(group);
+    });
+}
+function renderExpertList() {
+    const c = document.getElementById('expertContainer');
+    c.innerHTML = '';
+    const g = document.createElement('div');
+    const ttl = document.createElement('div');
+    ttl.className = 'category-title expert';
+    ttl.textContent = t('categoryExpert');
+    g.appendChild(ttl);
+    const grid = document.createElement('div');
+    grid.className = 'levels-grid';
+    expertLevels.forEach(lvl => {
+        const done = playerData.expertDone.includes(lvl.name);
+        const card = document.createElement('div');
+        card.className = 'level-card' + (done ? ' completed' : '');
+        card.innerHTML = `
+            ${done ? '<div class="completed-badge">✓</div>' : ''}
+            <h3>${lvl.name}</h3>
+            <p>${lvl.hint}</p>
+            <div class="level-meta"><span>🧠</span>${done ? `<span class="reward-badge done">${t('passedBadge')}</span>` : `<span class="reward-badge">🪙 +${REWARDS.expert}</span>`}</div>
+        `;
+        card.onclick = () => { isCustomGame = false; startLevel(lvl); };
+        grid.appendChild(card);
+    });
+    g.appendChild(grid);
+    c.appendChild(g);
+}
+function renderCustomLevelsList() {
+    const c = document.getElementById('customLevelsContainer');
+    const arr = getCustomLevels();
+    c.innerHTML = '';
+    if (arr.length === 0) { c.innerHTML = `<p style="color: var(--text-muted); text-align:center; margin-top:30px;">${t('noCustomLevels')}</p>`; return; }
+    const g = document.createElement('div');
+    const ttl = document.createElement('div');
+    ttl.className = 'category-title custom';
+    ttl.textContent = t('categoryCustom');
+    g.appendChild(ttl);
+    const grid = document.createElement('div');
+    grid.className = 'levels-grid';
+    arr.forEach((lvl, i) => {
+        const card = document.createElement('div');
+        card.className = 'level-card';
+        card.style.position = 'relative';
+        card.innerHTML = `
+            <h3 style="color:#7c3aed;">${lvl.name}</h3>
+            <p>${lvl.obstacles ? lvl.obstacles.length : 0} × 🚧</p>
+            <div class="level-meta"><span class="reward-badge">🪙 +${REWARDS.custom}</span></div>
+            <button class="delete-btn" style="position:absolute; top:8px; right:8px;">×</button>
+        `;
+        card.onclick = (e) => { if (e.target.classList.contains('delete-btn')) return; isCustomGame = true; startLevel(lvl); };
+        card.querySelector('.delete-btn').onclick = (e) => {
+            e.stopPropagation();
+            if (confirm(t('confirmDelete')(lvl.name))) {
+                const a = getCustomLevels(); a.splice(i, 1); setCustomLevels(a); renderCustomLevelsList(); showToast(t('toastLevelDeleted'));
+            }
+        };
+        grid.appendChild(card);
+    });
+    g.appendChild(grid);
+    c.appendChild(g);
+}
+
+function startLevel(lvl) {
+    currentLevel = lvl;
+    isCustomGame = lvl.name && !/^([123]|E\d)\.?/.test(lvl.name) && !/^E\d/.test(lvl.name);
+    rebuildFlatLevels();
+    currentFlatIndex = flatLevels.findIndex(item => item.level.name === lvl.name && (item.source === 'custom') === isCustomGame);
+    const tc = getTargets(lvl).length;
+    document.getElementById('gameDescription').innerHTML = `<b>${lvl.name}</b>${tc > 1 ? `<br><b>🎯 ×${tc}</b>` : ''}<br>${lvl.hint || ''}`;
+    const banner = document.getElementById('expertBanner');
+    if (lvl.forbidden || lvl.allowed || lvl.maxLen) {
+        banner.style.display = 'flex';
+        let txt = '🧠 ';
+        if (lvl.forbidden && lvl.forbidden.length) txt += `Запрещено: ${lvl.forbidden.join(', ')}. `;
+        if (lvl.allowed && lvl.allowed.length) txt += `Разрешено: ${lvl.allowed.join(', ')}. `;
+        if (lvl.maxLen) txt += `Макс. длина: ${lvl.maxLen}.`;
+        banner.textContent = txt;
+    } else banner.style.display = 'none';
+    document.getElementById('funcInput').value = "";
+    document.getElementById('statusBox').textContent = t('statusEnter');
+    document.getElementById('statusBox').className = 'status-box neutral';
+    levelJustCompleted = false;
+    victoryAnimStart = null;
+    currentSessionKey = null;
+    const saved = loadJSON(STORAGE_KEYS.SESSION, null);
+    if (saved && saved.levelName === lvl.name && saved.formula) {
+        setTimeout(() => {
+            if (confirm(t('confirmContinueSession'))) {
+                document.getElementById('funcInput').value = saved.formula;
+                plotFunction();
+            }
+        }, 200);
+    }
+    showScreen('gameScreen');
+}
+
+/* ============================================================
+   GAME
+============================================================ */
+const canvas = document.getElementById('canvas');
+const container = document.getElementById('graphicsContainer');
+const gameScale = { val: CONFIG.DEFAULT_SCALE };
+const gameOffset = { x: 0, y: 0 };
+
+function resizeCanvas() {
+    const nw = container.clientWidth, nh = container.clientHeight;
+    if (Math.abs(nw - canvas.width) < 30 && Math.abs(nh - canvas.height) < 30) return;
+    canvas.width = nw; canvas.height = nh;
+    plotFunction();
+}
+window.addEventListener('resize', () => { resizeCanvas(); resizeFreeCanvas(); resizeEditorCanvas(); if (mpState.active) resizeMpCanvas(); });
+
+function validateExpert(rawInput) {
+    if (!currentLevel) return { ok: true };
+    if (currentLevel.maxLen && rawInput.length > currentLevel.maxLen) return { ok: false, msg: `max ${currentLevel.maxLen}` };
+    if (currentLevel.forbidden) for (const f of currentLevel.forbidden) if (rawInput.includes(f)) return { ok: false, msg: f };
+    if (currentLevel.allowed) {
+        const cleaned = rawInput.replace(/\s/g, '');
+        const tokens = cleaned.match(/[a-z]+/gi) || [];
+        for (const tk of tokens) if (!currentLevel.allowed.includes(tk)) return { ok: false, msg: tk };
+    }
+    return { ok: true };
+}
+
+function plotFunction() {
+    if (!currentLevel) return;
+    const ox = canvas.width / 2 + gameOffset.x;
+    const oy = canvas.height / 2 + gameOffset.y;
+    const ctx = canvas.getContext('2d');
+    const allTargets = getTargets(currentLevel);
+    drawGridBase(ctx, canvas, {
+        scale: gameScale.val, offsetX: gameOffset.x, offsetY: gameOffset.y,
+        targets: allTargets, obstacles: currentLevel.obstacles || []
+    });
+    const statusBox = document.getElementById('statusBox');
+    const rawInput = document.getElementById('funcInput').value.trim();
+    if (!rawInput) {
+        statusBox.textContent = t('statusEnter');
+        statusBox.className = 'status-box neutral';
+        levelJustCompleted = false;
+        gameFunctions = [];
+        return;
+    }
+    const ev = validateExpert(rawInput);
+    if (!ev.ok) { statusBox.textContent = `🚫 ${ev.msg}`; statusBox.className = 'status-box fail'; gameFunctions = []; return; }
+    const fn = compileFunction(rawInput);
+    if (!fn) { statusBox.textContent = t('statusSyntaxError'); statusBox.className = 'status-box fail'; levelJustCompleted = false; gameFunctions = []; return; }
+    gameFunctions = [fn];
+    if (currentSessionKey !== rawInput) { currentSessionKey = rawInput; saveJSON(STORAGE_KEYS.SESSION, { levelName: currentLevel.name, formula: rawInput }); }
+    drawFunctionLine(ctx, fn, ox, oy, gameScale.val, getFunctionColor(), getFunctionWidth(), canvas.width, canvas.height);
+    const hits = new Array(allTargets.length).fill(false);
+    let hitObs = false;
+    for (let px = 0; px <= canvas.width; px += CONFIG.HIT_CHECK_STEP) {
+        const mx = (px - ox) / gameScale.val;
+        let my; try { my = fn(mx); if (isNaN(my) || !isFinite(my)) continue; } catch (e) { continue; }
+        allTargets.forEach((t2, i) => { if (Math.hypot(mx - t2.x, my - t2.y) <= t2.radius) hits[i] = true; });
+        (currentLevel.obstacles || []).forEach(obs => {
+            if (!obs.type || obs.type === 'rect') { if (mx >= obs.x1 && mx <= obs.x2 && my >= obs.y1 && my <= obs.y2) hitObs = true; }
+            else if (obs.type === 'circle') { if (Math.hypot(mx - obs.x, my - obs.y) <= (obs.radius || 1)) hitObs = true; }
+            else if (obs.type === 'line') { if (distanceToSegment(mx, my, obs.x1, obs.y1, obs.x2, obs.y2) <= (obs.thickness || CONFIG.LINE_THICKNESS)) hitObs = true; }
+        });
+    }
+    const allHit = hits.every(v => v);
+    const cnt = hits.filter(v => v).length;
+    if (hitObs) { statusBox.textContent = t('statusHitObstacle'); statusBox.className = 'status-box fail'; levelJustCompleted = false; }
+    else if (allHit) {
+        if (!levelJustCompleted) {
+            const res = completeLevel(currentLevel);
+            levelJustCompleted = true;
+            statusBox.textContent = `${t('statusPassed')} +${res.reward || 0} 🪙`;
+            statusBox.className = 'status-box success';
+            document.getElementById('funcInput').blur();
+            document.body.classList.remove('input-focused');
+            victoryAnimStart = Date.now();
+            const animate = () => {
+                if (victoryAnimStart === null) return;
+                const elapsed = Date.now() - victoryAnimStart;
+                if (elapsed > CONFIG.VICTORY_DURATION) { victoryAnimStart = null; plotFunction(); return; }
+                plotFunction();
+                requestAnimationFrame(animate);
+            };
+            requestAnimationFrame(animate);
+            setTimeout(() => showLevelCompleteModal(currentLevel, rawInput, res.reward, res.isFirstTime), CONFIG.VICTORY_DURATION);
+        }
+    } else if (allTargets.length > 1) {
+        statusBox.textContent = t('statusTargetsProgress')(cnt, allTargets.length);
+        statusBox.className = 'status-box neutral';
+        levelJustCompleted = false;
+    } else {
+        statusBox.textContent = t('statusGoalMissed');
+        statusBox.className = 'status-box neutral';
+        levelJustCompleted = false;
+    }
+}
+
+attachHandlersWithCoords(canvas, container, plotFunction, gameScale, gameOffset,
+    () => ({ targets: getTargets(currentLevel || {}), obstacles: (currentLevel && currentLevel.obstacles) || [], functions: gameFunctions }),
+    document.getElementById('gameTooltip')
+);
+function zoomIn() { gameScale.val = Math.min(gameScale.val * CONFIG.ZOOM_STEP, CONFIG.MAX_SCALE); plotFunction(); }
+function zoomOut() { gameScale.val = Math.max(gameScale.val / CONFIG.ZOOM_STEP, CONFIG.MIN_SCALE); plotFunction(); }
+function resetView() { gameScale.val = CONFIG.DEFAULT_SCALE; gameOffset.x = 0; gameOffset.y = 0; plotFunction(); }
+document.getElementById('funcInput').addEventListener('input', () => { if (victoryAnimStart) return; levelJustCompleted = false; plotFunction(); });
+document.getElementById('funcInput').addEventListener('focus', () => document.body.classList.add('input-focused'));
+document.getElementById('funcInput').addEventListener('blur', () => document.body.classList.remove('input-focused'));
+(function trackKeyboard() {
+    if (!window.visualViewport) return;
+    const initialHeight = window.innerHeight;
+    window.visualViewport.addEventListener('resize', () => {
+        const keyboardHeight = initialHeight - window.visualViewport.height;
+        document.body.classList.toggle('keyboard-open', keyboardHeight > 150);
+    });
+})();
+
+function getLevelReward(lvl) {
+    if (lvl.name.startsWith('E')) return REWARDS.expert;
+    if (lvl.name.startsWith('1.')) return REWARDS.easy;
+    if (lvl.name.startsWith('2.')) return REWARDS.medium;
+    if (lvl.name.startsWith('3.')) return REWARDS.hard;
+    return REWARDS.custom;
+}
+function completeLevel(lvl) {
+    const isExpert = lvl.name.startsWith('E');
+    const arr = isExpert ? playerData.expertDone : playerData.completed;
+    if (arr.includes(lvl.name)) return { reward: 0, isFirstTime: false };
+    let reward = getLevelReward(lvl);
+    if (activeBonusDouble > 0) { reward *= 2; activeBonusDouble--; saveJSON(STORAGE_KEYS.BONUS_DOUBLE, activeBonusDouble); }
+    arr.push(lvl.name);
+    playerData.coins += reward;
+    playerData.stats.totalEarned += reward;
+    playerData.stats.levelsPlayed++;
+    if (gameFunctions.length) {
+        const raw = document.getElementById('funcInput').value.trim();
+        playerData.stats.formulas.push(raw);
+        if (playerData.stats.formulas.length > 100) playerData.stats.formulas.shift();
+    }
+    savePlayer(); updateCoinDisplays(); checkAchievements();
+    return { reward, isFirstTime: true };
+}
+function showLevelCompleteModal(lvl, sol, reward, first) {
+    document.getElementById('completeLevelName').textContent = lvl.name;
+    document.getElementById('completeSolution').textContent = sol;
+    const rw = document.getElementById('completeReward');
+    const amt = document.getElementById('completeRewardAmount');
+    if (first && reward > 0) { rw.style.opacity = '1'; amt.textContent = '+' + reward; }
+    else { rw.style.opacity = '0.5'; amt.textContent = t('alreadyDone'); }
+    const pb = document.getElementById('btnPrevLevel');
+    const nb = document.getElementById('btnNextLevel');
+    const cp = currentFlatIndex > 0;
+    const cn = currentFlatIndex >= 0 && currentFlatIndex < flatLevels.length - 1;
+    pb.disabled = !cp; nb.disabled = !cn;
+    pb.classList.toggle('disabled', !cp); nb.classList.toggle('disabled', !cn);
+    openModal('levelCompleteModal');
+}
+function closeLevelComplete() { closeModal('levelCompleteModal'); }
+function goToPrevLevel() { if (currentFlatIndex > 0) { currentFlatIndex--; const it = flatLevels[currentFlatIndex]; isCustomGame = it.source === 'custom'; closeLevelComplete(); startLevel(it.level); } }
+function goToNextLevel() { if (currentFlatIndex < flatLevels.length - 1) { currentFlatIndex++; const it = flatLevels[currentFlatIndex]; isCustomGame = it.source === 'custom'; closeLevelComplete(); startLevel(it.level); } }
+function retryLevel() { closeLevelComplete(); startLevel(currentLevel); }
+
+function updateCoinDisplays() {
+    const total = levelCategories.reduce((s, c) => s + c.levels.length, 0) + expertLevels.length;
+    const done = playerData.completed.length + playerData.expertDone.length;
+    document.getElementById('coinCount').textContent = playerData.coins;
+    document.querySelectorAll('.coinCountBadge').forEach(el => el.textContent = playerData.coins);
+    document.getElementById('progressText').textContent = `${done} / ${total}`;
+    document.getElementById('progressFill').style.width = (done / total * 100) + '%';
+    const ach = document.getElementById('achCountBadge');
+    if (ach) ach.textContent = `${playerData.achievements.length}/${ACHIEVEMENTS.length}`;
+}
+
+/* ============================================================
+   FREE CALC
+============================================================ */
+const freeCanvas = document.getElementById('freeCanvas');
+const freeContainer = document.getElementById('freeGraphicsContainer');
+const freeScale = { val: CONFIG.DEFAULT_SCALE };
+const freeOffset = { x: 0, y: 0 };
+let freeRows = [];
+let activeInput = null;
+let freeCompiled = [];
+let freeCalcTargetMode = false;
+let freeCalcTargets = [];
+
+function resizeFreeCanvas() {
+    const nw = freeContainer.clientWidth, nh = freeContainer.clientHeight;
+    if (Math.abs(nw - freeCanvas.width) < 30 && Math.abs(nh - freeCanvas.height) < 30) return;
+    freeCanvas.width = nw; freeCanvas.height = nh;
+    drawFreeCalculator();
+}
+function addFreeFunctionRow(v = "x^2") {
+    const c = document.getElementById('freeFunctionsContainer');
+    const id = 'free_row_' + Date.now() + Math.random();
+    const d = document.createElement('div');
+    d.className = 'input-row'; d.id = id;
+    const col = CONFIG.COLORS[freeRows.length % CONFIG.COLORS.length];
+    d.innerHTML = `<label style="color:${col};">f(x)=</label>
+        <input type="text" value="${v}" oninput="drawFreeCalculator()" onfocus="activeInput=this" autocomplete="off" spellcheck="false">
+        <button class="delete-btn" onclick="removeFreeRow('${id}')">×</button>`;
+    c.appendChild(d);
+    const inp = d.querySelector('input');
+    freeRows.push({ id, input: inp, color: col });
+    activeInput = inp;
+    drawFreeCalculator();
+}
+function removeFreeRow(id) { document.getElementById(id)?.remove(); freeRows = freeRows.filter(r => r.id !== id); drawFreeCalculator(); }
+function drawFreeCalculator() {
+    drawGridBase(freeCanvas.getContext('2d'), freeCanvas, { scale: freeScale.val, offsetX: freeOffset.x, offsetY: freeOffset.y, targets: freeCalcTargets, obstacles: null });
+    const ox = freeCanvas.width / 2 + freeOffset.x;
+    const oy = freeCanvas.height / 2 + freeOffset.y;
+    const ctx = freeCanvas.getContext('2d');
+    freeCompiled = [];
+    freeRows.forEach(row => {
+        const fn = compileFunction(row.input.value);
+        freeCompiled.push(fn);
+        if (!fn) return;
+        drawFunctionLine(ctx, fn, ox, oy, freeScale.val, row.color, 3, freeCanvas.width, freeCanvas.height);
+    });
+    if (freeCalcTargets.length > 0) {
+        let hitCount = 0;
+        freeCalcTargets.forEach(t2 => {
+            let hit = false;
+            freeCompiled.forEach(fn => {
+                if (!fn) return;
+                for (let px = 0; px <= freeCanvas.width; px += 4) {
+                    const mx = (px - ox) / freeScale.val;
+                    let my; try { my = fn(mx); } catch (e) { continue; }
+                    if (isNaN(my) || !isFinite(my)) continue;
+                    if (Math.hypot(mx - t2.x, my - t2.y) <= t2.radius) { hit = true; break; }
+                }
+            });
+            if (hit) hitCount++;
+        });
+        if (hitCount === freeCalcTargets.length && freeCalcTargets.length > 0) {
+            showToast(t('toastAllTargetsHit'), 'reward');
+            setTimeout(() => { freeCalcTargets = []; drawFreeCalculator(); }, 1500);
+        }
+    }
+}
+function toggleFreeCalcMode() {
+    freeCalcTargetMode = !freeCalcTargetMode;
+    const btn = document.getElementById('freeCalcModeBtn');
+    btn.textContent = freeCalcTargetMode ? t('targetsModeOn') : t('targetsModeOff');
+    btn.style.background = freeCalcTargetMode ? 'var(--success)' : 'var(--card-bg)';
+    btn.style.color = freeCalcTargetMode ? '#fff' : 'var(--text-main)';
+    if (!freeCalcTargetMode) { freeCalcTargets = []; drawFreeCalculator(); }
+    showToast(freeCalcTargetMode ? t('toastTargetModeOn') : t('toastTargetModeOff'));
+}
+function freeClearTargets() { freeCalcTargets = []; drawFreeCalculator(); }
+attachHandlersWithCoords(freeCanvas, freeContainer, drawFreeCalculator, freeScale, freeOffset,
+    () => ({ targets: freeCalcTargets, obstacles: [], functions: freeCompiled }),
+    document.getElementById('freeTooltip'),
+    (wx, wy) => { if (freeCalcTargetMode) { freeCalcTargets.push({ x: Math.round(wx*10)/10, y: Math.round(wy*10)/10, radius: 0.8 }); drawFreeCalculator(); } }
+);
+function freeZoomIn() { freeScale.val = Math.min(freeScale.val * CONFIG.ZOOM_STEP, CONFIG.MAX_SCALE); drawFreeCalculator(); }
+function freeZoomOut() { freeScale.val = Math.max(freeScale.val / CONFIG.ZOOM_STEP, CONFIG.MIN_SCALE); drawFreeCalculator(); }
+function freeResetView() { freeScale.val = CONFIG.DEFAULT_SCALE; freeOffset.x = 0; freeOffset.y = 0; drawFreeCalculator(); }
+function openFreeCalculator() {
+    showScreen('freeCalcScreen');
+    document.getElementById('freeFunctionsContainer').innerHTML = '';
+    freeRows = []; freeCalcTargets = []; freeCalcTargetMode = false;
+    const btn = document.getElementById('freeCalcModeBtn');
+    btn.textContent = t('targetsModeOff');
+    btn.style.background = ''; btn.style.color = '';
+    addFreeFunctionRow("x");
+    addFreeFunctionRow("2/x");
+}
+function insertToActiveInput(v) {
+    if (!activeInput) { if (freeRows.length > 0) activeInput = freeRows[0].input; else return; }
+    const s = activeInput.selectionStart, e = activeInput.selectionEnd;
+    const tx = activeInput.value;
+    activeInput.value = tx.substring(0, s) + v + tx.substring(e);
+    activeInput.selectionStart = activeInput.selectionEnd = s + v.length;
+    activeInput.focus();
+    drawFreeCalculator();
+}
+
+/* ============================================================
+   EDITOR
+============================================================ */
+const editorCanvas = document.getElementById('editorCanvas');
+const editorContainer = document.getElementById('editorGraphicsContainer');
+const editorScale = { val: CONFIG.DEFAULT_SCALE };
+const editorOffset = { x: 0, y: 0 };
+let editorTool = 'target';
+let editorData = { name: "My Level", target: { x: 3, y: 2, radius: 0.8 }, obstacles: [] };
+let lineFirstPoint = null;
+let historyStack = [], historyStep = -1;
+function resizeEditorCanvas() {
+    const nw = editorContainer.clientWidth, nh = editorContainer.clientHeight;
+    if (Math.abs(nw - editorCanvas.width) < 30 && Math.abs(nh - editorCanvas.height) < 30) return;
+    editorCanvas.width = nw; editorCanvas.height = nh;
+    drawEditor();
+}
+function setEditorTool(tool) {
+    editorTool = tool;
+    document.querySelectorAll('.tool-btn, [id^="tool"]').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('tool' + tool.charAt(0).toUpperCase() + tool.slice(1));
+    if (btn) btn.classList.add('active');
+    lineFirstPoint = null; drawEditor();
+}
+function pushEditorHistory() { historyStep++; historyStack = historyStack.slice(0, historyStep); historyStack.push(JSON.parse(JSON.stringify(editorData))); }
+function editorUndo() { if (historyStep > 0) { historyStep--; editorData = JSON.parse(JSON.stringify(historyStack[historyStep])); drawEditor(); } }
+function editorRedo() { if (historyStep < historyStack.length - 1) { historyStep++; editorData = JSON.parse(JSON.stringify(historyStack[historyStep])); drawEditor(); } }
+function drawEditor() {
+    drawGridBase(editorCanvas.getContext('2d'), editorCanvas, {
+        scale: editorScale.val, offsetX: editorOffset.x, offsetY: editorOffset.y,
+        targets: editorData.target ? [editorData.target] : [],
+        obstacles: editorData.obstacles, tempPoint: lineFirstPoint
+    });
+}
+attachHandlersWithCoords(editorCanvas, editorContainer, drawEditor, editorScale, editorOffset,
+    () => ({ targets: editorData.target ? [editorData.target] : [], obstacles: editorData.obstacles, functions: [] }),
+    document.getElementById('editorTooltip'),
+    (wx, wy) => handleEditorAction(wx, wy)
+);
+function handleEditorAction(wx, wy) {
+    if (editorTool === 'target') { editorData.target = { x: Math.round(wx*10)/10, y: Math.round(wy*10)/10, radius: 0.8 }; pushEditorHistory(); }
+    else if (editorTool === 'rect') { editorData.obstacles.push({ type:'rect', x1: Math.round((wx-0.75)*10)/10, x2: Math.round((wx+0.75)*10)/10, y1: Math.round((wy-0.75)*10)/10, y2: Math.round((wy+0.75)*10)/10 }); pushEditorHistory(); }
+    else if (editorTool === 'circle') { editorData.obstacles.push({ type:'circle', x: Math.round(wx*10)/10, y: Math.round(wy*10)/10, radius: 1 }); pushEditorHistory(); }
+    else if (editorTool === 'line') {
+        if (!lineFirstPoint) lineFirstPoint = { x: wx, y: wy };
+        else { editorData.obstacles.push({ type:'line', x1: lineFirstPoint.x, y1: lineFirstPoint.y, x2: wx, y2: wy, thickness: CONFIG.LINE_THICKNESS }); lineFirstPoint = null; pushEditorHistory(); }
+    }
+    else if (editorTool === 'eraser') {
+        editorData.obstacles = editorData.obstacles.filter(obs => {
+            if (!obs.type || obs.type === 'rect') return !(wx >= obs.x1 && wx <= obs.x2 && wy >= obs.y1 && wy <= obs.y2);
+            if (obs.type === 'circle') return Math.hypot(wx - obs.x, wy - obs.y) > (obs.radius || 1);
+            if (obs.type === 'line') return distanceToSegment(wx, wy, obs.x1, obs.y1, obs.x2, obs.y2) > (obs.thickness || CONFIG.LINE_THICKNESS) * 2;
+            return true;
+        });
+        pushEditorHistory();
+    }
+    drawEditor();
+}
+function initEditor() {
+    editorData = { name: "New Level", target: { x: 3, y: 2, radius: 0.8 }, obstacles: [] };
+    historyStack = []; historyStep = -1; pushEditorHistory();
+    document.getElementById('levelNameInput').value = editorData.name;
+    drawEditor();
+}
+function openNewEditor() { showScreen('editorScreen'); initEditor(); }
+document.getElementById('saveEditorBtn').onclick = () => {
+    editorData.name = document.getElementById('levelNameInput').value || "Level";
+    editorData.hint = "";
+    const c = getCustomLevels(); c.push(JSON.parse(JSON.stringify(editorData))); setCustomLevels(c);
+    showScreen('editorMenuScreen'); showToast(t('toastLevelSaved')); checkAchievements();
+};
+document.getElementById('clearEditorBtn').onclick = () => initEditor();
+
+/* ============================================================
+   MULTIPLAYER CLIENT
+============================================================ */
+let socket = null;
+let mpState = {
+    active: false, role: null, roomId: null, myId: null, opponentId: null,
+    players: [], currentRound: 0, currentLevelId: null, currentLevel: null,
+    myTime: 0, oppTime: 0, roundStartTime: 0, timerInterval: null,
+    scores: {}, totalTimes: {}, opponentFormula: '', opponentSkin: null,
+    hitRegistered: false, roundFinished: false, spectators: 0
+};
+
+function connectSocket() {
+    if (socket && socket.connected) return socket;
+    if (typeof io === 'undefined') {
+        showToast('❌ Сервер не подключён. Запусти node server.js');
+        return null;
+    }
+    socket = io();
+    socket.on('connect', () => {
+        mpState.myId = socket.id;
+        socket.emit('set_skin', { skin: { id: playerData.equipped.skin, color: getFunctionColor(), width: getFunctionWidth() } });
+    });
+    socket.on('connect_error', () => showToast('❌ Ошибка соединения с сервером'));
+    socket.on('waiting_for_opponent', () => showScreen('matchmakingScreen'));
+    socket.on('search_cancelled', () => showScreen('multiplayerScreen'));
+    socket.on('room_created', ({ roomId }) => {
+        document.getElementById('privateRoomCodeDisplay').textContent = roomId;
+        document.getElementById('privateRoomCreate').style.display = 'none';
+        document.getElementById('privateRoomWaiting').style.display = 'block';
+    });
+    socket.on('join_error', ({ msg }) => showToast('❌ ' + msg));
+    socket.on('match_start', ({ matchId, levels, players }) => {
+        mpState.active = true;
+        mpState.role = 'player';
+        mpState.players = players;
+        mpState.myId = socket.id;
+        mpState.opponentId = players.find(p => p.id !== socket.id)?.id;
+        mpState.scores = {}; mpState.totalTimes = {};
+        players.forEach(p => { mpState.scores[p.id] = 0; mpState.totalTimes[p.id] = 0; });
+        const oppName = players.find(p => p.id !== socket.id)?.nickname || 'Соперник';
+        document.getElementById('mpOppName').textContent = oppName.toUpperCase();
+        document.getElementById('mpMyInput').disabled = false;
+        document.getElementById('mpSkipBtn').style.display = 'block';
+        document.getElementById('mpSpectatorBadge').style.display = 'none';
+        showScreen('mpGameScreen');
+        setTimeout(resizeMpCanvas, 100);
+    });
+    socket.on('opponent_formula', ({ formula }) => {
+        mpState.opponentFormula = formula;
+        document.getElementById('mpOppInput').value = formula;
+        drawMpGraph();
+    });
+    socket.on('opponent_skin', ({ skin }) => { mpState.opponentSkin = skin; drawMpGraph(); });
+    socket.on('round_start', ({ roundNumber, levelId, isExtraRound }) => {
+        mpState.currentRound = roundNumber;
+        mpState.currentLevelId = levelId;
+        mpState.currentLevel = multiplayerLevels[levelId];
+        mpState.hitRegistered = false;
+        mpState.roundFinished = false;
+        mpState.opponentFormula = '';
+        mpState.roundStartTime = Date.now();
+        document.getElementById('mpRoundInfo').textContent = `Раунд ${roundNumber}${isExtraRound ? ' (доп.)' : '/3'}`;
+        document.getElementById('mpMyInput').value = '';
+        document.getElementById('mpMyInput').disabled = false;
+        document.getElementById('mpOppInput').value = '';
+        document.getElementById('mpMyStatus').textContent = '';
+        document.getElementById('mpOppStatus').textContent = '';
+        document.getElementById('mpStatusBox').textContent = 'Введи формулу';
+        document.getElementById('mpStatusBox').className = 'status-box neutral';
+        if (mpState.currentLevel) document.getElementById('mpLevelDesc').innerHTML = `<b>${mpState.currentLevel.name}</b> · ${mpState.currentLevel.hint}`;
+        document.getElementById('mpSkipBtn').disabled = false;
+        document.getElementById('mpSkipBtn').textContent = '⏭️ Пропустить';
+        if (mpState.timerInterval) clearInterval(mpState.timerInterval);
+        mpState.timerInterval = setInterval(updateMpTimer, 100);
+        resizeMpCanvas();
+        drawMpGraph();
+    });
+    socket.on('player_hit_announce', ({ playerId, nickname, timeMs }) => {
+        if (playerId === socket.id) document.getElementById('mpMyStatus').innerHTML = `✅ <b>${(timeMs/1000).toFixed(1)}s</b>`;
+        else { document.getElementById('mpOppStatus').innerHTML = `✅ <b>${(timeMs/1000).toFixed(1)}s</b>`; showToast(`🔴 ${nickname} попал!`); }
+    });
+    socket.on('round_end', ({ reason, scores, totalTimes }) => {
+        mpState.roundFinished = true;
+        mpState.scores = scores; mpState.totalTimes = totalTimes;
+        if (mpState.timerInterval) clearInterval(mpState.timerInterval);
+        updateMpScores();
+        let txt = reason === 'skip' ? '⏭️ Раунд пропущен' : (reason === 'timeout' ? '⏱ Время вышло' : '🏁 Раунд завершён');
+        document.getElementById('mpStatusBox').textContent = txt;
+        document.getElementById('mpStatusBox').className = 'status-box neutral';
+    });
+    socket.on('skip_request', ({ fromNickname }) => {
+        if (confirm(`⏭️ ${fromNickname} просит пропустить раунд. Согласен?`)) socket.emit('skip_response', { accepted: true });
+        else socket.emit('skip_response', { accepted: false });
+    });
+    socket.on('skip_accepted', ({ byNickname }) => showToast(`⏭️ Раунд пропущен (${byNickname})`, 'reward'));
+    socket.on('skip_denied', ({ byNickname, isTimeout }) => showToast(`❌ ${isTimeout ? 'Не ответил' : byNickname + ' отказал'}`, 'fail'));
+    socket.on('skip_error', ({ msg }) => showToast('❌ ' + msg));
+    socket.on('match_finished', ({ reason, winnerId, isDraw, players, forfeitBy }) => {
+        mpState.active = false;
+        if (mpState.timerInterval) clearInterval(mpState.timerInterval);
+        showMatchResult(winnerId, isDraw, players, reason, forfeitBy);
+    });
+    socket.on('spectate_state', (data) => {
+        mpState.role = 'spectator';
+        mpState.players = data.players;
+        mpState.myId = 'spectator';
+        mpState.currentLevelId = data.level;
+        mpState.currentLevel = multiplayerLevels[data.level];
+        mpState.currentRound = data.round;
+        mpState.scores = data.scores;
+        showScreen('mpGameScreen');
+        document.getElementById('mpMyInput').disabled = true;
+        document.getElementById('mpSkipBtn').style.display = 'none';
+        document.getElementById('mpOppName').textContent = (data.players[1]?.nickname || 'Соперник').toUpperCase();
+        document.getElementById('mpSpectatorBadge').style.display = 'block';
+        document.getElementById('mpSpectatorCount').textContent = '1';
+        if (mpState.timerInterval) clearInterval(mpState.timerInterval);
+        mpState.timerInterval = setInterval(updateMpTimer, 100);
+        setTimeout(resizeMpCanvas, 100);
+    });
+    socket.on('spectator_joined', ({ count }) => { mpState.spectators = count; document.getElementById('mpSpectatorCount').textContent = count; });
+    socket.on('spectator_left', ({ count }) => { mpState.spectators = count; document.getElementById('mpSpectatorCount').textContent = count; });
+    socket.on('active_matches', (list) => renderActiveMatches(list));
+    socket.on('spectate_error', ({ msg }) => showToast('❌ ' + msg));
+    return socket;
+}
+
+function openMultiplayer() { connectSocket(); const nick = loadJSON(STORAGE_KEYS.NICK, ''); document.getElementById('mpNickname').value = nick; showScreen('multiplayerScreen'); }
+function startMatchmaking() {
+    const nick = document.getElementById('mpNickname').value.trim() || 'Игрок';
+    saveJSON(STORAGE_KEYS.NICK, nick);
+    connectSocket();
+    if (socket) socket.emit('find_match', { nickname: nick });
+}
+function cancelMatchmaking() { if (socket) socket.emit('cancel_search'); showScreen('multiplayerScreen'); }
+function openPrivateRoom() {
+    const nick = loadJSON(STORAGE_KEYS.NICK, 'Игрок');
+    document.getElementById('mpNickname').value = nick;
+    document.getElementById('privateRoomCreate').style.display = 'flex';
+    document.getElementById('privateRoomWaiting').style.display = 'none';
+    document.getElementById('privateRoomCode').value = '';
+    showScreen('privateRoomScreen');
+}
+function createPrivateRoom() {
+    const nick = document.getElementById('mpNickname').value.trim() || 'Игрок';
+    saveJSON(STORAGE_KEYS.NICK, nick);
+    connectSocket();
+    if (socket) socket.emit('create_private_room', { nickname: nick });
+}
+function joinPrivateRoom() {
+    const code = document.getElementById('privateRoomCode').value.trim().toUpperCase();
+    if (code.length !== 4) { showToast('Код 4 символа'); return; }
+    const nick = loadJSON(STORAGE_KEYS.NICK, 'Игрок');
+    connectSocket();
+    if (socket) socket.emit('join_private_room', { roomId: code, nickname: nick });
+}
+
+const mpCanvas = document.getElementById('mpCanvas');
+const mpContainer = document.getElementById('mpGraphicsContainer');
+const mpScale = { val: CONFIG.DEFAULT_SCALE };
+const mpOffset = { x: 0, y: 0 };
+function resizeMpCanvas() {
+    if (!mpContainer.clientWidth) return;
+    mpCanvas.width = mpContainer.clientWidth;
+    mpCanvas.height = mpContainer.clientHeight;
+    drawMpGraph();
+}
+function drawMpGraph() {
+    if (!mpCanvas || !mpState.currentLevel) return;
+    const ctx = mpCanvas.getContext('2d');
+    const allTargets = getTargets(mpState.currentLevel);
+    drawGridBase(ctx, mpCanvas, { scale: mpScale.val, offsetX: mpOffset.x, offsetY: mpOffset.y, targets: allTargets, obstacles: mpState.currentLevel.obstacles || [] });
+    const ox = mpCanvas.width / 2 + mpOffset.x;
+    const oy = mpCanvas.height / 2 + mpOffset.y;
+    if (mpState.opponentFormula) {
+        const oppFn = compileFunction(mpState.opponentFormula);
+        if (oppFn) {
+            const oppColor = (mpState.opponentSkin && mpState.opponentSkin.color) || '#ef4444';
+            const oppWidth = (mpState.opponentSkin && mpState.opponentSkin.width) || 3;
+            drawFunctionLine(ctx, oppFn, ox, oy, mpScale.val, oppColor, oppWidth, mpCanvas.width, mpCanvas.height);
+        }
+    }
+    const myInput = document.getElementById('mpMyInput');
+    if (myInput && myInput.value && mpState.role === 'player') {
+        const myFn = compileFunction(myInput.value);
+        if (myFn) drawFunctionLine(ctx, myFn, ox, oy, mpScale.val, getFunctionColor(), getFunctionWidth(), mpCanvas.width, mpCanvas.height);
+    }
+}
+attachHandlersWithCoords(mpCanvas, mpContainer, drawMpGraph, mpScale, mpOffset,
+    () => ({
+        targets: mpState.currentLevel ? getTargets(mpState.currentLevel) : [],
+        obstacles: (mpState.currentLevel && mpState.currentLevel.obstacles) || [],
+        functions: (() => {
+            const fns = [];
+            const oppFn = mpState.opponentFormula ? compileFunction(mpState.opponentFormula) : null;
+            if (oppFn) fns.push(oppFn);
+            const myInput = document.getElementById('mpMyInput');
+            if (myInput && myInput.value && mpState.role === 'player') {
+                const myFn = compileFunction(myInput.value);
+                if (myFn) fns.push(myFn);
+            }
+            return fns;
+        })()
+    }),
+    document.getElementById('mpTooltip')
+);
+
+document.getElementById('mpMyInput').addEventListener('input', () => {
+    if (mpState.role !== 'player' || mpState.roundFinished) return;
+    const formula = document.getElementById('mpMyInput').value.trim();
+    drawMpGraph();
+    if (socket && socket.connected) socket.emit('formula_update', { formula });
+    if (!formula || mpState.hitRegistered) return;
+    const fn = compileFunction(formula);
+    if (!fn) { document.getElementById('mpStatusBox').textContent = t('statusSyntaxError'); document.getElementById('mpStatusBox').className = 'status-box fail'; return; }
+    const ox = mpCanvas.width / 2 + mpOffset.x;
+    const oy = mpCanvas.height / 2 + mpOffset.y;
+    let hitTarget = false, hitObs = false;
+    const targets = getTargets(mpState.currentLevel);
+    for (let px = 0; px <= mpCanvas.width; px += 2) {
+        const mx = (px - ox) / mpScale.val;
+        let my; try { my = fn(mx); } catch(e) { continue; }
+        if (isNaN(my) || !isFinite(my)) continue;
+        targets.forEach(t2 => { if (Math.hypot(mx - t2.x, my - t2.y) <= t2.radius) hitTarget = true; });
+        (mpState.currentLevel.obstacles || []).forEach(o => {
+            if (!o.type || o.type === 'rect') { if (mx >= o.x1 && mx <= o.x2 && my >= o.y1 && my <= o.y2) hitObs = true; }
+            else if (o.type === 'circle') { if (Math.hypot(mx - o.x, my - o.y) <= (o.radius || 1)) hitObs = true; }
+            else if (o.type === 'line') { if (distanceToSegment(mx, my, o.x1, o.y1, o.x2, o.y2) <= (o.thickness || CONFIG.LINE_THICKNESS)) hitObs = true; }
+        });
+    }
+    if (hitObs) { document.getElementById('mpStatusBox').textContent = t('statusHitObstacle'); document.getElementById('mpStatusBox').className = 'status-box fail'; return; }
+    if (hitTarget && !mpState.hitRegistered) {
+        mpState.hitRegistered = true;
+        const timeMs = Date.now() - mpState.roundStartTime;
+        document.getElementById('mpStatusBox').textContent = `🎉 Попал! ${(timeMs/1000).toFixed(1)}s`;
+        document.getElementById('mpStatusBox').className = 'status-box success';
+        document.getElementById('mpMyInput').blur();
+        if (socket) socket.emit('player_hit', { timeMs });
+    }
+});
+document.getElementById('mpMyInput').addEventListener('focus', () => document.body.classList.add('input-focused'));
+document.getElementById('mpMyInput').addEventListener('blur', () => document.body.classList.remove('input-focused'));
+
+function updateMpTimer() {
+    if (!mpState.roundStartTime || mpState.roundFinished) return;
+    const elapsed = Date.now() - mpState.roundStartTime;
+    document.getElementById('mpTimer').textContent = (elapsed / 1000).toFixed(1) + 's';
+}
+function updateMpScores() {
+    const me = mpState.scores[mpState.myId] || 0;
+    const opp = mpState.scores[mpState.opponentId] || 0;
+    document.getElementById('mpScoreP1').textContent = `Ты: ${me}`;
+    document.getElementById('mpScoreP2').textContent = `Соперник: ${opp}`;
+}
+function requestSkip() {
+    if (!socket || mpState.roundFinished) return;
+    if (!confirm('⏭️ Запросить пропуск раунда?')) return;
+    socket.emit('request_skip');
+    document.getElementById('mpSkipBtn').disabled = true;
+    document.getElementById('mpSkipBtn').textContent = '⏳ Ожидание...';
+}
+function forfeitMatch() {
+    if (!confirm('🚪 Сдаться?')) return;
+    if (socket) socket.emit('forfeit_match');
+}
+function showMatchResult(winnerId, isDraw, players, reason, forfeitBy) {
+    const modal = document.getElementById('matchResultModal');
+    const emoji = document.getElementById('matchResultEmoji');
+    const title = document.getElementById('matchResultTitle');
+    const details = document.getElementById('matchResultDetails');
+    const reward = document.getElementById('matchResultReward');
+    const me = players.find(p => p.id === mpState.myId);
+    const opp = players.find(p => p.id !== mpState.myId);
+    const iWon = winnerId === mpState.myId;
+    const iLost = forfeitBy === mpState.myId;
+    let rewardCoins = 0;
+    if (iWon) { emoji.textContent = '🏆'; title.textContent = 'ПОБЕДА!'; title.style.color = 'var(--success)'; rewardCoins = 50; }
+    else if (isDraw) { emoji.textContent = '🤝'; title.textContent = 'НИЧЬЯ'; title.style.color = 'var(--gold)'; rewardCoins = 25; }
+    else { emoji.textContent = iLost ? '🚪' : '😢'; title.textContent = iLost ? 'СДАЛСЯ' : 'ПОРАЖЕНИЕ'; title.style.color = 'var(--danger)'; rewardCoins = 5; }
+    playerData.coins += rewardCoins;
+    playerData.stats.totalEarned += rewardCoins;
+    reward.innerHTML = `🪙 <b>+${rewardCoins}</b>${rewardCoins === 5 ? ' (утешительно)' : ''}`;
+    const myTime = me ? (me.totalTime / 1000).toFixed(1) : '?';
+    const oppTime = opp ? (opp.totalTime / 1000).toFixed(1) : '?';
+    details.innerHTML = `Ты: ${myTime}s<br>Соперник: ${oppTime}s<br>Раунды: ${me ? me.roundsWon : 0} : ${opp ? opp.roundsWon : 0}`;
+    if (me && opp) {
+        const history = loadJSON(STORAGE_KEYS.MATCH_HISTORY, []);
+        history.unshift({
+            date: Date.now(),
+            opponent: opp.nickname,
+            result: iWon ? 'win' : (isDraw ? 'draw' : 'loss'),
+            myTime: me.totalTime, oppTime: opp.totalTime,
+            myRounds: me.roundsWon, oppRounds: opp.roundsWon
+        });
+        if (history.length > 50) history.length = 50;
+        saveJSON(STORAGE_KEYS.MATCH_HISTORY, history);
+    }
+    savePlayer(); updateCoinDisplays(); checkAchievements();
+    modal.classList.add('active');
+}
+function closeMatchResult() {
+    document.getElementById('matchResultModal').classList.remove('active');
+    if (socket) socket.emit('stop_spectating');
+    mpState.active = false;
+    showScreen('mainMenu');
+}
+function playAgain() {
+    document.getElementById('matchResultModal').classList.remove('active');
+    mpState.active = false;
+    startMatchmaking();
+}
+let currentMatchesTab = 'active';
+function openMatches() { showScreen('matchesScreen'); switchMatchesTab('active'); }
+function switchMatchesTab(tab) {
+    currentMatchesTab = tab;
+    ['Active', 'History', 'Stats'].forEach(name => {
+        const btn = document.getElementById('tab' + name);
+        if (!btn) return;
+        const isActive = name.toLowerCase() === tab;
+        btn.style.background = isActive ? 'var(--primary)' : '';
+        btn.style.color = isActive ? '#fff' : '';
+    });
+    if (tab === 'active') {
+        connectSocket();
+        if (socket) socket.emit('get_active_matches');
+        document.getElementById('matchesContent').innerHTML = '<p style="color: var(--text-muted); text-align: center;">Загрузка...</p>';
+    } else if (tab === 'history') renderMatchHistory();
+    else renderMatchStats();
+}
+function renderActiveMatches(list) {
+    const c = document.getElementById('matchesContent');
+    if (!list || list.length === 0) { c.innerHTML = '<p style="color: var(--text-muted); text-align: center;">Сейчас никто не играет.</p>'; return; }
+    c.innerHTML = list.map(m => `
+        <div class="level-card" style="margin-bottom: 10px;">
+            <h3>🎮 ${m.players.join(' vs ')}</h3>
+            <div class="level-meta"><span>Раунд ${m.round}/3</span><span>${m.level}</span><span>👁 ${m.spectators}</span></div>
+            <button class="menu-btn primary" onclick="watchMatch('${m.roomId}')" style="margin-top: 10px; padding: 8px; font-size: 0.85rem; max-width:none;">👁 Смотреть</button>
+        </div>
+    `).join('');
+}
+function watchMatch(roomId) { connectSocket(); if (socket) socket.emit('spectate', { roomId }); }
+function renderMatchHistory() {
+    const history = loadJSON(STORAGE_KEYS.MATCH_HISTORY, []);
+    const c = document.getElementById('matchesContent');
+    if (history.length === 0) { c.innerHTML = '<p style="color: var(--text-muted); text-align: center;">Матчей пока нет.</p>'; return; }
+    c.innerHTML = history.map(m => {
+        const emoji = m.result === 'win' ? '✅' : (m.result === 'draw' ? '🤝' : '❌');
+        const date = new Date(m.date).toLocaleString();
+        return `<div class="level-card" style="margin-bottom: 8px;"><h3>${emoji} ${m.opponent}</h3><div class="level-meta"><span>${date}</span><span>${(m.myTime/1000).toFixed(1)}s / ${(m.oppTime/1000).toFixed(1)}s</span></div></div>`;
+    }).join('');
+}
+function renderMatchStats() {
+    const history = loadJSON(STORAGE_KEYS.MATCH_HISTORY, []);
+    const wins = history.filter(m => m.result === 'win').length;
+    const losses = history.filter(m => m.result === 'loss').length;
+    const draws = history.filter(m => m.result === 'draw').length;
+    const total = history.length;
+    const winrate = total > 0 ? Math.round(wins / total * 100) : 0;
+    document.getElementById('matchesContent').innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Матчей</div></div>
+            <div class="stat-card"><div class="stat-value" style="color: var(--success);">${wins}</div><div class="stat-label">Побед</div></div>
+            <div class="stat-card"><div class="stat-value" style="color: var(--danger);">${losses}</div><div class="stat-label">Поражений</div></div>
+            <div class="stat-card"><div class="stat-value" style="color: var(--gold);">${draws}</div><div class="stat-label">Ничьих</div></div>
+            <div class="stat-card"><div class="stat-value">${winrate}%</div><div class="stat-label">Винрейт</div></div>
+        </div>
+    `;
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+applyTheme();
+applyTranslations();
+rebuildFlatLevels();
+updateCoinDisplays();
+setTimeout(() => checkDailyBonus(), 800);
+setInterval(() => { playerData.stats.playTimeMs += 30000; savePlayer(); }, 30000);
+window.addEventListener('beforeunload', () => {
+    if (currentLevel && document.getElementById('funcInput').value.trim()) {
+        saveJSON(STORAGE_KEYS.SESSION, { levelName: currentLevel.name, formula: document.getElementById('funcInput').value.trim() });
+    }
+});
+</script>
+</body>
+</html>
